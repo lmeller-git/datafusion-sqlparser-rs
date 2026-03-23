@@ -34,6 +34,14 @@ use sqlparser::parser::{ParserError, ParserOptions};
 use sqlparser::tokenizer::Token;
 
 #[test]
+fn pragma_on() {
+    let sql = "PRAGMA automatic_index=ON";
+    match sqlite_and_generic().one_statement_parses_to(sql, "PRAGMA automatic_index = 'ON'") {
+        Statement::Pragma { .. } => {}
+        _ => unreachable!(),
+    }
+}
+#[test]
 fn pragma_no_value() {
     let sql = "PRAGMA cache_size";
     match sqlite_and_generic().verified_stmt(sql) {

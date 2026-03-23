@@ -11526,6 +11526,11 @@ impl<'a> Parser<'a> {
                         },
                     )?,
                 },
+                Keyword::ON | Keyword::OFF
+                    if !self.dialect.is_reserved_for_identifier(w.keyword) =>
+                {
+                    ok_value(Value::SingleQuotedString(w.to_string()))
+                }
                 _ => self.expected(
                     "a concrete value",
                     TokenWithSpan {
