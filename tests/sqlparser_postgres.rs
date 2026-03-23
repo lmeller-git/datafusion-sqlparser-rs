@@ -4441,7 +4441,7 @@ $$"#;
                     DataType::Varchar(None),
                 ),
             ]),
-            return_type: Some(DataType::Boolean),
+            return_type: Some(FunctionReturnType::DataType(DataType::Boolean)),
             language: Some("plpgsql".into()),
             behavior: None,
             called_on_null: None,
@@ -4484,7 +4484,7 @@ $$"#;
                     DataType::Int(None)
                 )
             ]),
-            return_type: Some(DataType::Boolean),
+            return_type: Some(FunctionReturnType::DataType(DataType::Boolean)),
             language: Some("plpgsql".into()),
             behavior: None,
             called_on_null: None,
@@ -4531,7 +4531,7 @@ $$"#;
                     DataType::Int(None)
                 ),
             ]),
-            return_type: Some(DataType::Boolean),
+            return_type: Some(FunctionReturnType::DataType(DataType::Boolean)),
             language: Some("plpgsql".into()),
             behavior: None,
             called_on_null: None,
@@ -4578,7 +4578,7 @@ $$"#;
                     DataType::Int(None)
                 ),
             ]),
-            return_type: Some(DataType::Boolean),
+            return_type: Some(FunctionReturnType::DataType(DataType::Boolean)),
             language: Some("plpgsql".into()),
             behavior: None,
             called_on_null: None,
@@ -4618,7 +4618,7 @@ $$"#;
                 ),
                 OperateFunctionArg::with_name("b", DataType::Varchar(None)),
             ]),
-            return_type: Some(DataType::Boolean),
+            return_type: Some(FunctionReturnType::DataType(DataType::Boolean)),
             language: Some("plpgsql".into()),
             behavior: None,
             called_on_null: None,
@@ -4661,7 +4661,7 @@ fn parse_create_function() {
                 OperateFunctionArg::unnamed(DataType::Integer(None)),
                 OperateFunctionArg::unnamed(DataType::Integer(None)),
             ]),
-            return_type: Some(DataType::Integer(None)),
+            return_type: Some(FunctionReturnType::DataType(DataType::Integer(None))),
             language: Some("SQL".into()),
             behavior: Some(FunctionBehavior::Immutable),
             called_on_null: Some(FunctionCalledOnNull::Strict),
@@ -4696,6 +4696,30 @@ fn parse_create_function_detailed() {
         "CREATE FUNCTION add(INTEGER, INTEGER DEFAULT 1) RETURNS INTEGER AS 'select $1 + $2;'",
         "CREATE FUNCTION add(INTEGER, INTEGER = 1) RETURNS INTEGER AS 'select $1 + $2;'",
     );
+}
+
+#[test]
+fn parse_create_function_returns_setof() {
+    pg_and_generic().verified_stmt(
+        "CREATE FUNCTION get_users() RETURNS SETOF TEXT LANGUAGE sql AS 'SELECT name FROM users'",
+    );
+    pg_and_generic().verified_stmt(
+        "CREATE FUNCTION get_ids() RETURNS SETOF INTEGER LANGUAGE sql AS 'SELECT id FROM users'",
+    );
+    pg_and_generic().verified_stmt(
+        r#"CREATE FUNCTION get_all() RETURNS SETOF my_schema."MyType" LANGUAGE sql AS 'SELECT * FROM t'"#,
+    );
+    pg_and_generic().verified_stmt(
+        "CREATE FUNCTION get_rows() RETURNS SETOF RECORD LANGUAGE sql AS 'SELECT * FROM t'",
+    );
+
+    let sql = "CREATE FUNCTION get_names() RETURNS SETOF TEXT LANGUAGE sql AS 'SELECT name FROM t'";
+    match pg_and_generic().verified_stmt(sql) {
+        Statement::CreateFunction(CreateFunction { return_type, .. }) => {
+            assert_eq!(return_type, Some(FunctionReturnType::SetOf(DataType::Text)));
+        }
+        _ => panic!("Expected CreateFunction"),
+    }
 }
 
 #[test]
@@ -4773,10 +4797,10 @@ fn parse_create_function_c_with_module_pathname() {
                 "input",
                 DataType::Custom(ObjectName::from(vec![Ident::new("cstring")]), vec![]),
             ),]),
-            return_type: Some(DataType::Custom(
+            return_type: Some(FunctionReturnType::DataType(DataType::Custom(
                 ObjectName::from(vec![Ident::new("cas")]),
                 vec![]
-            )),
+            ))),
             language: Some("c".into()),
             behavior: Some(FunctionBehavior::Immutable),
             called_on_null: None,
@@ -6409,6 +6433,7 @@ fn parse_trigger_related_functions() {
             transient: false,
             volatile: false,
             iceberg: false,
+            snapshot: false,
             name: ObjectName::from(vec![Ident::new("emp")]),
             columns: vec![
                 ColumnDef {
@@ -6461,6 +6486,7 @@ fn parse_trigger_related_functions() {
             default_ddl_collation: None,
             with_aggregation_policy: None,
             with_row_access_policy: None,
+            with_storage_lifecycle_policy: None,
             with_tags: None,
             base_location: None,
             external_volume: None,
@@ -6477,6 +6503,7 @@ fn parse_trigger_related_functions() {
             diststyle: None,
             distkey: None,
             sortkey: None,
+            backup: None,
         }
     );
 
@@ -6491,7 +6518,7 @@ fn parse_trigger_related_functions() {
             if_not_exists: false,
             name: ObjectName::from(vec![Ident::new("emp_stamp")]),
             args: Some(vec![]),
-            return_type: Some(DataType::Trigger),
+            return_type: Some(FunctionReturnType::DataType(DataType::Trigger)),
             function_body: Some(
                 CreateFunctionBody::AsBeforeOptions {
                     body: Expr::Value((
@@ -8701,5 +8728,65 @@ fn parse_pg_analyze() {
             assert!(!analyze.for_columns);
         }
         _ => panic!("Expected Analyze, got: {stmt:?}"),
+    }
+}
+
+#[test]
+fn parse_lock_table() {
+    pg_and_generic().one_statement_parses_to(
+        "LOCK public.widgets IN EXCLUSIVE MODE",
+        "LOCK TABLE public.widgets IN EXCLUSIVE MODE",
+    );
+    pg_and_generic().one_statement_parses_to(
+        "LOCK TABLE public.widgets NOWAIT",
+        "LOCK TABLE public.widgets NOWAIT",
+    );
+
+    let stmt = pg_and_generic().verified_stmt(
+        "LOCK TABLE ONLY public.widgets, analytics.events * IN SHARE ROW EXCLUSIVE MODE NOWAIT",
+    );
+    match stmt {
+        Statement::Lock(lock) => {
+            assert_eq!(lock.tables.len(), 2);
+            assert_eq!(lock.tables[0].name.to_string(), "public.widgets");
+            assert!(lock.tables[0].only);
+            assert!(!lock.tables[0].has_asterisk);
+            assert_eq!(lock.tables[1].name.to_string(), "analytics.events");
+            assert!(!lock.tables[1].only);
+            assert!(lock.tables[1].has_asterisk);
+            assert_eq!(lock.lock_mode, Some(LockTableMode::ShareRowExclusive));
+            assert!(lock.nowait);
+        }
+        _ => panic!("Expected Lock, got: {stmt:?}"),
+    }
+
+    let lock_modes = [
+        ("ACCESS SHARE", LockTableMode::AccessShare),
+        ("ROW SHARE", LockTableMode::RowShare),
+        ("ROW EXCLUSIVE", LockTableMode::RowExclusive),
+        (
+            "SHARE UPDATE EXCLUSIVE",
+            LockTableMode::ShareUpdateExclusive,
+        ),
+        ("SHARE", LockTableMode::Share),
+        ("SHARE ROW EXCLUSIVE", LockTableMode::ShareRowExclusive),
+        ("EXCLUSIVE", LockTableMode::Exclusive),
+        ("ACCESS EXCLUSIVE", LockTableMode::AccessExclusive),
+    ];
+
+    for (mode_sql, expected_mode) in lock_modes {
+        let stmt = pg_and_generic()
+            .verified_stmt(&format!("LOCK TABLE public.widgets IN {mode_sql} MODE"));
+        match stmt {
+            Statement::Lock(lock) => {
+                assert_eq!(lock.tables.len(), 1);
+                assert_eq!(lock.tables[0].name.to_string(), "public.widgets");
+                assert!(!lock.tables[0].only);
+                assert!(!lock.tables[0].has_asterisk);
+                assert_eq!(lock.lock_mode, Some(expected_mode));
+                assert!(!lock.nowait);
+            }
+            _ => panic!("Expected Lock, got: {stmt:?}"),
+        }
     }
 }

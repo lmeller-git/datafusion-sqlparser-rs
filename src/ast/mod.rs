@@ -72,13 +72,13 @@ pub use self::ddl::{
     CreatePolicyCommand, CreatePolicyType, CreateTable, CreateTrigger, CreateView, Deduplicate,
     DeferrableInitial, DistStyle, DropBehavior, DropExtension, DropFunction, DropOperator,
     DropOperatorClass, DropOperatorFamily, DropOperatorSignature, DropPolicy, DropTrigger,
-    ForValues, GeneratedAs, GeneratedExpressionMode, IdentityParameters, IdentityProperty,
-    IdentityPropertyFormatKind, IdentityPropertyKind, IdentityPropertyOrder, IndexColumn,
-    IndexOption, IndexType, KeyOrIndexDisplay, Msck, NullsDistinctOption, OperatorArgTypes,
-    OperatorClassItem, OperatorFamilyDropItem, OperatorFamilyItem, OperatorOption, OperatorPurpose,
-    Owner, Partition, PartitionBoundValue, ProcedureParam, ReferentialAction, RenameTableNameKind,
-    ReplicaIdentity, TagsColumnOption, TriggerObjectKind, Truncate,
-    UserDefinedTypeCompositeAttributeDef, UserDefinedTypeInternalLength,
+    ForValues, FunctionReturnType, GeneratedAs, GeneratedExpressionMode, IdentityParameters,
+    IdentityProperty, IdentityPropertyFormatKind, IdentityPropertyKind, IdentityPropertyOrder,
+    IndexColumn, IndexOption, IndexType, KeyOrIndexDisplay, Msck, NullsDistinctOption,
+    OperatorArgTypes, OperatorClassItem, OperatorFamilyDropItem, OperatorFamilyItem,
+    OperatorOption, OperatorPurpose, Owner, Partition, PartitionBoundValue, ProcedureParam,
+    ReferentialAction, RenameTableNameKind, ReplicaIdentity, TagsColumnOption, TriggerObjectKind,
+    Truncate, UserDefinedTypeCompositeAttributeDef, UserDefinedTypeInternalLength,
     UserDefinedTypeRangeOption, UserDefinedTypeRepresentation, UserDefinedTypeSqlDefinitionOption,
     UserDefinedTypeStorage, ViewColumnDef,
 };
@@ -651,6 +651,14 @@ pub enum JsonPathElem {
         /// The expression used as the bracket key (string or numeric expression).
         key: Expr,
     },
+    /// Access an object field using colon bracket notation
+    /// e.g. `obj:['foo']`
+    ///
+    /// See <https://docs.databricks.com/en/sql/language-manual/functions/colonsign.html>
+    ColonBracket {
+        /// The expression used as the bracket key (string or numeric expression).
+        key: Expr,
+    },
 }
 
 /// A JSON path.
@@ -684,6 +692,9 @@ impl fmt::Display for JsonPath {
                 }
                 JsonPathElem::Bracket { key } => {
                     write!(f, "[{key}]")?;
+                }
+                JsonPathElem::ColonBracket { key } => {
+                    write!(f, ":[{key}]")?;
                 }
             }
         }
@@ -4624,6 +4635,12 @@ pub enum Statement {
         is_eq: bool,
     },
     /// ```sql
+    /// LOCK [ TABLE ] [ ONLY ] name [ * ] [, ...] [ IN lockmode MODE ] [ NOWAIT ]
+    /// ```
+    ///
+    /// See <https://www.postgresql.org/docs/current/sql-lock.html>
+    Lock(Lock),
+    /// ```sql
     /// LOCK TABLES <table_name> [READ [LOCAL] | [LOW_PRIORITY] WRITE]
     /// ```
     /// Note: this is a MySQL-specific statement. See <https://dev.mysql.com/doc/refman/8.0/en/lock-tables.html>
@@ -4844,6 +4861,12 @@ impl From<Analyze> for Statement {
 impl From<ddl::Truncate> for Statement {
     fn from(truncate: ddl::Truncate) -> Self {
         Statement::Truncate(truncate)
+    }
+}
+
+impl From<Lock> for Statement {
+    fn from(lock: Lock) -> Self {
+        Statement::Lock(lock)
     }
 }
 
@@ -6141,6 +6164,7 @@ impl fmt::Display for Statement {
                 }
                 Ok(())
             }
+            Statement::Lock(lock) => lock.fmt(f),
             Statement::LockTables { tables } => {
                 write!(f, "LOCK TABLES {}", display_comma_separated(tables))
             }
@@ -6384,6 +6408,104 @@ impl fmt::Display for TruncateTableTarget {
             write!(f, " *")?;
         };
         Ok(())
+    }
+}
+
+/// A `LOCK` statement.
+///
+/// See <https://www.postgresql.org/docs/current/sql-lock.html>
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Lock {
+    /// List of tables to lock.
+    pub tables: Vec<LockTableTarget>,
+    /// Lock mode.
+    pub lock_mode: Option<LockTableMode>,
+    /// Whether `NOWAIT` was specified.
+    pub nowait: bool,
+}
+
+impl fmt::Display for Lock {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "LOCK TABLE {}", display_comma_separated(&self.tables))?;
+        if let Some(lock_mode) = &self.lock_mode {
+            write!(f, " IN {lock_mode} MODE")?;
+        }
+        if self.nowait {
+            write!(f, " NOWAIT")?;
+        }
+        Ok(())
+    }
+}
+
+/// Target of a `LOCK TABLE` command
+///
+/// See <https://www.postgresql.org/docs/current/sql-lock.html>
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct LockTableTarget {
+    /// Name of the table being locked.
+    #[cfg_attr(feature = "visitor", visit(with = "visit_relation"))]
+    pub name: ObjectName,
+    /// Whether `ONLY` was specified to exclude descendant tables.
+    pub only: bool,
+    /// Whether `*` was specified to explicitly include descendant tables.
+    pub has_asterisk: bool,
+}
+
+impl fmt::Display for LockTableTarget {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.only {
+            write!(f, "ONLY ")?;
+        }
+        write!(f, "{}", self.name)?;
+        if self.has_asterisk {
+            write!(f, " *")?;
+        }
+        Ok(())
+    }
+}
+
+/// PostgreSQL lock modes for `LOCK TABLE`.
+///
+/// See <https://www.postgresql.org/docs/current/sql-lock.html>
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+pub enum LockTableMode {
+    /// `ACCESS SHARE`
+    AccessShare,
+    /// `ROW SHARE`
+    RowShare,
+    /// `ROW EXCLUSIVE`
+    RowExclusive,
+    /// `SHARE UPDATE EXCLUSIVE`
+    ShareUpdateExclusive,
+    /// `SHARE`
+    Share,
+    /// `SHARE ROW EXCLUSIVE`
+    ShareRowExclusive,
+    /// `EXCLUSIVE`
+    Exclusive,
+    /// `ACCESS EXCLUSIVE`
+    AccessExclusive,
+}
+
+impl fmt::Display for LockTableMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let text = match self {
+            Self::AccessShare => "ACCESS SHARE",
+            Self::RowShare => "ROW SHARE",
+            Self::RowExclusive => "ROW EXCLUSIVE",
+            Self::ShareUpdateExclusive => "SHARE UPDATE EXCLUSIVE",
+            Self::Share => "SHARE",
+            Self::ShareRowExclusive => "SHARE ROW EXCLUSIVE",
+            Self::Exclusive => "EXCLUSIVE",
+            Self::AccessExclusive => "ACCESS EXCLUSIVE",
+        };
+        write!(f, "{text}")
     }
 }
 
@@ -10350,6 +10472,30 @@ impl Display for RowAccessPolicy {
     }
 }
 
+/// Snowflake `[ WITH ] STORAGE LIFECYCLE POLICY <policy_name> ON ( <col_name> [ , ... ] )`
+///
+/// <https://docs.snowflake.com/en/sql-reference/sql/create-table>
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+pub struct StorageLifecyclePolicy {
+    /// The fully-qualified policy object name.
+    pub policy: ObjectName,
+    /// Column names the policy applies to.
+    pub on: Vec<Ident>,
+}
+
+impl Display for StorageLifecyclePolicy {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "WITH STORAGE LIFECYCLE POLICY {} ON ({})",
+            self.policy,
+            display_comma_separated(self.on.as_slice())
+        )
+    }
+}
+
 /// Snowflake `WITH TAG ( tag_name = '<tag_value>', ...)`
 ///
 /// <https://docs.snowflake.com/en/sql-reference/sql/create-table>
@@ -10742,6 +10888,16 @@ pub enum TableObject {
     /// ```
     /// [Clickhouse](https://clickhouse.com/docs/en/sql-reference/table-functions)
     TableFunction(Function),
+
+    /// Table specified through a sub-query
+    /// Example:
+    /// ```sql
+    /// INSERT INTO
+    /// (SELECT employee_id, last_name, email, hire_date, job_id,  salary, commission_pct FROM employees)
+    /// VALUES (207, 'Gregory', 'pgregory@example.com', sysdate, 'PU_CLERK', 1.2E3, NULL);
+    /// ```
+    /// [Oracle](https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/INSERT.html#GUID-903F8043-0254-4EE9-ACC1-CB8AC0AF3423__I2126242)
+    TableQuery(Box<Query>),
 }
 
 impl fmt::Display for TableObject {
@@ -10749,6 +10905,7 @@ impl fmt::Display for TableObject {
         match self {
             Self::TableName(table_name) => write!(f, "{table_name}"),
             Self::TableFunction(func) => write!(f, "FUNCTION {func}"),
+            Self::TableQuery(table_query) => write!(f, "({table_query})"),
         }
     }
 }
