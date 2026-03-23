@@ -21,7 +21,7 @@ use alloc::boxed::Box;
 use crate::ast::BinaryOperator;
 use crate::ast::{Expr, Statement};
 use crate::dialect::Dialect;
-use crate::keywords::Keyword;
+use crate::keywords::{self, Keyword};
 use crate::parser::{Parser, ParserError};
 
 /// A [`Dialect`] for [SQLite](https://www.sqlite.org)
@@ -123,5 +123,12 @@ impl Dialect for SQLiteDialect {
 
     fn supports_comma_separated_trim(&self) -> bool {
         true
+    }
+
+    fn is_reserved_for_identifier(&self, kw: Keyword) -> bool {
+        match kw {
+            Keyword::ON | Keyword::OFF | Keyword::TRUE | Keyword::FALSE => false,
+            _ => keywords::RESERVED_FOR_IDENTIFIER.contains(&kw),
+        }
     }
 }
