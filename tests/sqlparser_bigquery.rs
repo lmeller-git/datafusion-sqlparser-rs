@@ -2289,7 +2289,7 @@ fn test_bigquery_create_function() {
                 Ident::new("myfunction"),
             ]),
             args: Some(vec![OperateFunctionArg::with_name("x", DataType::Float64),]),
-            return_type: Some(DataType::Float64),
+            return_type: Some(FunctionReturnType::DataType(DataType::Float64)),
             function_body: Some(CreateFunctionBody::AsAfterOptions(Expr::Value(
                 number("42").with_empty_span()
             ))),
@@ -2899,4 +2899,26 @@ fn test_alter_schema() {
     bigquery_and_generic().verified_stmt("ALTER SCHEMA mydataset SET OPTIONS (location = 'us')");
     bigquery_and_generic()
         .verified_stmt("ALTER SCHEMA IF EXISTS mydataset SET OPTIONS (location = 'us')");
+}
+
+#[test]
+fn test_create_snapshot_table() {
+    bigquery_and_generic()
+        .verified_stmt("CREATE SNAPSHOT TABLE dataset_id.table1 CLONE dataset_id.table2");
+
+    bigquery().verified_stmt(
+        "CREATE SNAPSHOT TABLE IF NOT EXISTS dataset_id.table1 CLONE dataset_id.table2",
+    );
+
+    bigquery().verified_stmt(
+        "CREATE SNAPSHOT TABLE dataset_id.table1 CLONE dataset_id.table2 FOR SYSTEM_TIME AS OF TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)",
+    );
+
+    bigquery().verified_stmt(
+        "CREATE SNAPSHOT TABLE dataset_id.table1 CLONE dataset_id.table2 OPTIONS(expiration_timestamp = TIMESTAMP '2025-01-01 00:00:00 UTC', friendly_name = 'my_table')",
+    );
+
+    bigquery().verified_stmt(
+        "CREATE SNAPSHOT TABLE IF NOT EXISTS dataset_id.table1 CLONE dataset_id.table2 FOR SYSTEM_TIME AS OF TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR) OPTIONS(expiration_timestamp = TIMESTAMP '2025-01-01 00:00:00 UTC')",
+    );
 }

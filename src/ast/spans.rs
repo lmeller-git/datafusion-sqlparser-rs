@@ -304,6 +304,7 @@ impl Spanned for Values {
 /// - [Statement::CreateSequence]
 /// - [Statement::CreateType]
 /// - [Statement::Pragma]
+/// - [Statement::Lock]
 /// - [Statement::LockTables]
 /// - [Statement::UnlockTables]
 /// - [Statement::Unload]
@@ -462,6 +463,7 @@ impl Spanned for Statement {
             Statement::CreateSequence { .. } => Span::empty(),
             Statement::CreateType { .. } => Span::empty(),
             Statement::Pragma { .. } => Span::empty(),
+            Statement::Lock(_) => Span::empty(),
             Statement::LockTables { .. } => Span::empty(),
             Statement::UnlockTables => Span::empty(),
             Statement::Unload { .. } => Span::empty(),
@@ -538,6 +540,7 @@ impl Spanned for CreateTable {
             transient: _,     // bool
             volatile: _,      // bool
             iceberg: _,       // bool, Snowflake specific
+            snapshot: _,      // bool, BigQuery specific
             name,
             columns,
             constraints,
@@ -569,6 +572,7 @@ impl Spanned for CreateTable {
             default_ddl_collation: _,           // string, no span
             with_aggregation_policy: _,         // todo, Snowflake specific
             with_row_access_policy: _,          // todo, Snowflake specific
+            with_storage_lifecycle_policy: _,   // todo, Snowflake specific
             with_tags: _,                       // todo, Snowflake specific
             external_volume: _,                 // todo, Snowflake specific
             base_location: _,                   // todo, Snowflake specific
@@ -585,6 +589,7 @@ impl Spanned for CreateTable {
             diststyle: _,
             distkey: _,
             sortkey: _,
+            backup: _,
         } = self;
 
         union_spans(
@@ -1797,6 +1802,7 @@ impl Spanned for JsonPathElem {
         match self {
             JsonPathElem::Dot { .. } => Span::empty(),
             JsonPathElem::Bracket { key } => key.span(),
+            JsonPathElem::ColonBracket { key } => key.span(),
         }
     }
 }
@@ -2382,6 +2388,7 @@ impl Spanned for TableObject {
                 union_spans(segments.iter().map(|i| i.span()))
             }
             TableObject::TableFunction(func) => func.span(),
+            TableObject::TableQuery(query) => query.span(),
         }
     }
 }

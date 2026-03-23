@@ -697,6 +697,10 @@ impl<'a> Parser<'a> {
                 // `INSTALL` is duckdb specific https://duckdb.org/docs/extensions/overview
                 Keyword::INSTALL if self.dialect.supports_install() => self.parse_install(),
                 Keyword::LOAD => self.parse_load(),
+                Keyword::LOCK => {
+                    self.prev_token();
+                    self.parse_lock_statement().map(Into::into)
+                }
                 Keyword::OPTIMIZE if self.dialect.supports_optimize_table() => {
                     self.parse_optimize_table()
                 }
@@ -4191,8 +4195,9 @@ impl<'a> Parser<'a> {
         match token.token {
             Token::Word(Word {
                 value,
-                // path segments in SF dot notation can be unquoted or double-quoted
-                quote_style: quote_style @ (Some('"') | None),
+                // path segments in SF dot notation can be unquoted or double-quoted;
+                // Databricks also supports backtick-quoted identifiers
+                quote_style: quote_style @ (Some('"') | Some('`') | None),
                 // some experimentation suggests that snowflake permits
                 // any keyword here unquoted.
                 keyword: _,
@@ -4222,6 +4227,12 @@ impl<'a> Parser<'a> {
         let mut path = Vec::new();
         loop {
             match self.next_token().token {
+                Token::Colon if path.is_empty() && self.peek_token_ref() == &Token::LBracket => {
+                    self.next_token();
+                    let key = self.parse_wildcard_expr()?;
+                    self.expect_token(&Token::RBracket)?;
+                    path.push(JsonPathElem::ColonBracket { key });
+                }
                 Token::Colon if path.is_empty() => {
                     path.push(self.parse_json_path_object_key()?);
                 }
@@ -4229,7 +4240,7 @@ impl<'a> Parser<'a> {
                     path.push(self.parse_json_path_object_key()?);
                 }
                 Token::LBracket => {
-                    let key = self.parse_expr()?;
+                    let key = self.parse_wildcard_expr()?;
                     self.expect_token(&Token::RBracket)?;
 
                     path.push(JsonPathElem::Bracket { key });
@@ -5099,7 +5110,9 @@ impl<'a> Parser<'a> {
         let persistent = dialect_of!(self is DuckDbDialect)
             && self.parse_one_of_keywords(&[Keyword::PERSISTENT]).is_some();
         let create_view_params = self.parse_create_view_params()?;
-        if self.parse_keyword(Keyword::TABLE) {
+        if self.peek_keywords(&[Keyword::SNAPSHOT, Keyword::TABLE]) {
+            self.parse_create_snapshot_table().map(Into::into)
+        } else if self.parse_keyword(Keyword::TABLE) {
             self.parse_create_table(or_replace, temporary, global, transient)
                 .map(Into::into)
         } else if self.peek_keyword(Keyword::MATERIALIZED)
@@ -5581,7 +5594,7 @@ impl<'a> Parser<'a> {
         self.expect_token(&Token::RParen)?;
 
         let return_type = if self.parse_keyword(Keyword::RETURNS) {
-            Some(self.parse_data_type()?)
+            Some(self.parse_function_return_type()?)
         } else {
             None
         };
@@ -5761,7 +5774,7 @@ impl<'a> Parser<'a> {
         let (name, args) = self.parse_create_function_name_and_params()?;
 
         let return_type = if self.parse_keyword(Keyword::RETURNS) {
-            Some(self.parse_data_type()?)
+            Some(self.parse_function_return_type()?)
         } else {
             None
         };
@@ -5864,11 +5877,11 @@ impl<'a> Parser<'a> {
             })
         })?;
 
-        let return_type = if return_table.is_some() {
-            return_table
-        } else {
-            Some(self.parse_data_type()?)
+        let data_type = match return_table {
+            Some(table_type) => table_type,
+            None => self.parse_data_type()?,
         };
+        let return_type = Some(FunctionReturnType::DataType(data_type));
 
         let _ = self.parse_keyword(Keyword::AS);
 
@@ -5918,6 +5931,14 @@ impl<'a> Parser<'a> {
             security: None,
             set_params: vec![],
         })
+    }
+
+    fn parse_function_return_type(&mut self) -> Result<FunctionReturnType, ParserError> {
+        if self.parse_keyword(Keyword::SETOF) {
+            Ok(FunctionReturnType::SetOf(self.parse_data_type()?))
+        } else {
+            Ok(FunctionReturnType::DataType(self.parse_data_type()?))
+        }
     }
 
     fn parse_create_function_name_and_params(
@@ -6313,6 +6334,40 @@ impl<'a> Parser<'a> {
             .external(true)
             .file_format(file_format)
             .location(location)
+            .build())
+    }
+
+    /// Parse `CREATE SNAPSHOT TABLE` statement.
+    ///
+    /// <https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_snapshot_table_statement>
+    pub fn parse_create_snapshot_table(&mut self) -> Result<CreateTable, ParserError> {
+        self.expect_keywords(&[Keyword::SNAPSHOT, Keyword::TABLE])?;
+        let if_not_exists = self.parse_keywords(&[Keyword::IF, Keyword::NOT, Keyword::EXISTS]);
+        let table_name = self.parse_object_name(true)?;
+
+        self.expect_keyword_is(Keyword::CLONE)?;
+        let clone = Some(self.parse_object_name(true)?);
+
+        let version =
+            if self.parse_keywords(&[Keyword::FOR, Keyword::SYSTEM_TIME, Keyword::AS, Keyword::OF])
+            {
+                Some(TableVersion::ForSystemTimeAsOf(self.parse_expr()?))
+            } else {
+                None
+            };
+
+        let table_options = if let Some(options) = self.maybe_parse_options(Keyword::OPTIONS)? {
+            CreateTableOptions::Options(options)
+        } else {
+            CreateTableOptions::None
+        };
+
+        Ok(CreateTableBuilder::new(table_name)
+            .snapshot(true)
+            .if_not_exists(if_not_exists)
+            .clone_clause(clone)
+            .version(version)
+            .table_options(table_options)
             .build())
     }
 
@@ -8388,6 +8443,14 @@ impl<'a> Parser<'a> {
 
         let strict = self.parse_keyword(Keyword::STRICT);
 
+        // Redshift: BACKUP YES|NO
+        let backup = if self.parse_keyword(Keyword::BACKUP) {
+            let keyword = self.expect_one_of_keywords(&[Keyword::YES, Keyword::NO])?;
+            Some(keyword == Keyword::YES)
+        } else {
+            None
+        };
+
         // Redshift: DISTSTYLE, DISTKEY, SORTKEY
         let diststyle = if self.parse_keyword(Keyword::DISTSTYLE) {
             Some(self.parse_dist_style()?)
@@ -8450,6 +8513,7 @@ impl<'a> Parser<'a> {
             .table_options(create_table_config.table_options)
             .primary_key(primary_key)
             .strict(strict)
+            .backup(backup)
             .diststyle(diststyle)
             .distkey(distkey)
             .sortkey(sortkey)
@@ -8561,7 +8625,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Parse a single [PartitionBoundValue].
+    /// Parse a single partition bound value (MINVALUE, MAXVALUE, or expression).
     fn parse_partition_bound_value(&mut self) -> Result<PartitionBoundValue, ParserError> {
         if self.parse_keyword(Keyword::MINVALUE) {
             Ok(PartitionBoundValue::MinValue)
@@ -12633,6 +12697,9 @@ impl<'a> Parser<'a> {
             let fn_name = self.parse_object_name(false)?;
             self.parse_function_call(fn_name)
                 .map(TableObject::TableFunction)
+        } else if self.dialect.supports_insert_table_query() && self.peek_subquery_or_cte_start() {
+            self.parse_parenthesized(|p| p.parse_query())
+                .map(TableObject::TableQuery)
         } else {
             self.parse_object_name(false).map(TableObject::TableName)
         }
@@ -16305,6 +16372,8 @@ impl<'a> Parser<'a> {
             {
                 let expr = self.parse_expr()?;
                 return Ok(Some(TableVersion::ForSystemTimeAsOf(expr)));
+            } else if self.peek_keyword(Keyword::CHANGES) {
+                return self.parse_table_version_changes().map(Some);
             } else if self.peek_keyword(Keyword::AT) || self.peek_keyword(Keyword::BEFORE) {
                 let func_name = self.parse_object_name(true)?;
                 let func = self.parse_function(func_name)?;
@@ -16318,6 +16387,30 @@ impl<'a> Parser<'a> {
             }
         }
         Ok(None)
+    }
+
+    /// Parses the Snowflake `CHANGES` clause for change tracking queries.
+    ///
+    /// Syntax:
+    /// ```sql
+    /// CHANGES (INFORMATION => DEFAULT)
+    ///   AT (TIMESTAMP => <expr>)
+    ///   [END (TIMESTAMP => <expr>)]
+    /// ```
+    ///
+    /// <https://docs.snowflake.com/en/sql-reference/constructs/changes>
+    fn parse_table_version_changes(&mut self) -> Result<TableVersion, ParserError> {
+        let changes_name = self.parse_object_name(true)?;
+        let changes = self.parse_function(changes_name)?;
+        let at_name = self.parse_object_name(true)?;
+        let at = self.parse_function(at_name)?;
+        let end = if self.peek_keyword(Keyword::END) {
+            let end_name = self.parse_object_name(true)?;
+            Some(self.parse_function(end_name)?)
+        } else {
+            None
+        };
+        Ok(TableVersion::Changes { changes, at, end })
     }
 
     /// Parses MySQL's JSON_TABLE column definition.
@@ -17520,9 +17613,44 @@ impl<'a> Parser<'a> {
     /// Returns true if the immediate tokens look like the
     /// beginning of a subquery. `(SELECT ...`
     fn peek_subquery_start(&mut self) -> bool {
-        let [maybe_lparen, maybe_select] = self.peek_tokens();
-        Token::LParen == maybe_lparen
-            && matches!(maybe_select, Token::Word(w) if w.keyword == Keyword::SELECT)
+        matches!(
+            self.peek_tokens_ref(),
+            [
+                TokenWithSpan {
+                    token: Token::LParen,
+                    ..
+                },
+                TokenWithSpan {
+                    token: Token::Word(Word {
+                        keyword: Keyword::SELECT,
+                        ..
+                    }),
+                    ..
+                },
+            ]
+        )
+    }
+
+    /// Returns true if the immediate tokens look like the
+    /// beginning of a subquery possibly preceded by CTEs;
+    /// i.e. `(WITH ...` or `(SELECT ...`.
+    fn peek_subquery_or_cte_start(&mut self) -> bool {
+        matches!(
+            self.peek_tokens_ref(),
+            [
+                TokenWithSpan {
+                    token: Token::LParen,
+                    ..
+                },
+                TokenWithSpan {
+                    token: Token::Word(Word {
+                        keyword: Keyword::SELECT | Keyword::WITH,
+                        ..
+                    }),
+                    ..
+                },
+            ]
+        )
     }
 
     fn parse_conflict_clause(&mut self) -> Option<SqliteOnConflict> {
@@ -18387,6 +18515,66 @@ impl<'a> Parser<'a> {
             of,
             nonblock,
         })
+    }
+
+    /// Parse a PostgreSQL `LOCK` statement.
+    pub fn parse_lock_statement(&mut self) -> Result<Lock, ParserError> {
+        self.expect_keyword(Keyword::LOCK)?;
+
+        if self.peek_keyword(Keyword::TABLES) {
+            return self.expected_ref("TABLE or a table name", self.peek_token_ref());
+        }
+
+        let _ = self.parse_keyword(Keyword::TABLE);
+        let tables = self.parse_comma_separated(Parser::parse_lock_table_target)?;
+        let lock_mode = if self.parse_keyword(Keyword::IN) {
+            let lock_mode = self.parse_lock_table_mode()?;
+            self.expect_keyword(Keyword::MODE)?;
+            Some(lock_mode)
+        } else {
+            None
+        };
+        let nowait = self.parse_keyword(Keyword::NOWAIT);
+
+        Ok(Lock {
+            tables,
+            lock_mode,
+            nowait,
+        })
+    }
+
+    fn parse_lock_table_target(&mut self) -> Result<LockTableTarget, ParserError> {
+        let only = self.parse_keyword(Keyword::ONLY);
+        let name = self.parse_object_name(false)?;
+        let has_asterisk = self.consume_token(&Token::Mul);
+
+        Ok(LockTableTarget {
+            name,
+            only,
+            has_asterisk,
+        })
+    }
+
+    fn parse_lock_table_mode(&mut self) -> Result<LockTableMode, ParserError> {
+        if self.parse_keywords(&[Keyword::ACCESS, Keyword::SHARE]) {
+            Ok(LockTableMode::AccessShare)
+        } else if self.parse_keywords(&[Keyword::ACCESS, Keyword::EXCLUSIVE]) {
+            Ok(LockTableMode::AccessExclusive)
+        } else if self.parse_keywords(&[Keyword::ROW, Keyword::SHARE]) {
+            Ok(LockTableMode::RowShare)
+        } else if self.parse_keywords(&[Keyword::ROW, Keyword::EXCLUSIVE]) {
+            Ok(LockTableMode::RowExclusive)
+        } else if self.parse_keywords(&[Keyword::SHARE, Keyword::UPDATE, Keyword::EXCLUSIVE]) {
+            Ok(LockTableMode::ShareUpdateExclusive)
+        } else if self.parse_keywords(&[Keyword::SHARE, Keyword::ROW, Keyword::EXCLUSIVE]) {
+            Ok(LockTableMode::ShareRowExclusive)
+        } else if self.parse_keyword(Keyword::SHARE) {
+            Ok(LockTableMode::Share)
+        } else if self.parse_keyword(Keyword::EXCLUSIVE) {
+            Ok(LockTableMode::Exclusive)
+        } else {
+            self.expected_ref("a PostgreSQL LOCK TABLE mode", self.peek_token_ref())
+        }
     }
 
     /// Parse a VALUES clause

@@ -28,8 +28,8 @@ use crate::ast::{
     ClusteredBy, ColumnDef, CommentDef, CreateTable, CreateTableLikeKind, CreateTableOptions,
     DistStyle, Expr, FileFormat, ForValues, HiveDistributionStyle, HiveFormat, Ident,
     InitializeKind, ObjectName, OnCommit, OneOrManyWithParens, Query, RefreshModeKind,
-    RowAccessPolicy, Statement, StorageSerializationPolicy, TableConstraint, TableVersion, Tag,
-    WrappedCollection,
+    RowAccessPolicy, Statement, StorageLifecyclePolicy, StorageSerializationPolicy,
+    TableConstraint, TableVersion, Tag, WrappedCollection,
 };
 
 use crate::parser::ParserError;
@@ -81,6 +81,8 @@ pub struct CreateTableBuilder {
     pub volatile: bool,
     /// Iceberg-specific table flag.
     pub iceberg: bool,
+    /// `SNAPSHOT` table flag.
+    pub snapshot: bool,
     /// Whether `DYNAMIC` table option is set.
     pub dynamic: bool,
     /// The table name.
@@ -147,6 +149,8 @@ pub struct CreateTableBuilder {
     pub with_aggregation_policy: Option<ObjectName>,
     /// Optional row access policy applied to the table.
     pub with_row_access_policy: Option<RowAccessPolicy>,
+    /// Optional storage lifecycle policy applied to the table.
+    pub with_storage_lifecycle_policy: Option<StorageLifecyclePolicy>,
     /// Optional tags/labels attached to the table metadata.
     pub with_tags: Option<Vec<Tag>>,
     /// Optional base location for staged data.
@@ -177,6 +181,8 @@ pub struct CreateTableBuilder {
     pub distkey: Option<Expr>,
     /// Redshift `SORTKEY` option.
     pub sortkey: Option<Vec<Expr>>,
+    /// Redshift `BACKUP` option.
+    pub backup: Option<bool>,
 }
 
 impl CreateTableBuilder {
@@ -191,6 +197,7 @@ impl CreateTableBuilder {
             transient: false,
             volatile: false,
             iceberg: false,
+            snapshot: false,
             dynamic: false,
             name,
             columns: vec![],
@@ -224,6 +231,7 @@ impl CreateTableBuilder {
             default_ddl_collation: None,
             with_aggregation_policy: None,
             with_row_access_policy: None,
+            with_storage_lifecycle_policy: None,
             with_tags: None,
             base_location: None,
             external_volume: None,
@@ -239,6 +247,7 @@ impl CreateTableBuilder {
             diststyle: None,
             distkey: None,
             sortkey: None,
+            backup: None,
         }
     }
     /// Set `OR REPLACE` for the CREATE TABLE statement.
@@ -279,6 +288,11 @@ impl CreateTableBuilder {
     /// Enable Iceberg table semantics.
     pub fn iceberg(mut self, iceberg: bool) -> Self {
         self.iceberg = iceberg;
+        self
+    }
+    /// Set `SNAPSHOT` table flag (BigQuery).
+    pub fn snapshot(mut self, snapshot: bool) -> Self {
+        self.snapshot = snapshot;
         self
     }
     /// Set `DYNAMIC` table option.
@@ -451,6 +465,14 @@ impl CreateTableBuilder {
         self.with_row_access_policy = with_row_access_policy;
         self
     }
+    /// Attach a storage lifecycle policy to the table.
+    pub fn with_storage_lifecycle_policy(
+        mut self,
+        with_storage_lifecycle_policy: Option<StorageLifecyclePolicy>,
+    ) -> Self {
+        self.with_storage_lifecycle_policy = with_storage_lifecycle_policy;
+        self
+    }
     /// Attach tags/labels to the table metadata.
     pub fn with_tags(mut self, with_tags: Option<Vec<Tag>>) -> Self {
         self.with_tags = with_tags;
@@ -529,6 +551,11 @@ impl CreateTableBuilder {
         self.sortkey = sortkey;
         self
     }
+    /// Set the Redshift `BACKUP` option.
+    pub fn backup(mut self, backup: Option<bool>) -> Self {
+        self.backup = backup;
+        self
+    }
     /// Consume the builder and produce a `CreateTable`.
     pub fn build(self) -> CreateTable {
         CreateTable {
@@ -540,6 +567,7 @@ impl CreateTableBuilder {
             transient: self.transient,
             volatile: self.volatile,
             iceberg: self.iceberg,
+            snapshot: self.snapshot,
             dynamic: self.dynamic,
             name: self.name,
             columns: self.columns,
@@ -573,6 +601,7 @@ impl CreateTableBuilder {
             default_ddl_collation: self.default_ddl_collation,
             with_aggregation_policy: self.with_aggregation_policy,
             with_row_access_policy: self.with_row_access_policy,
+            with_storage_lifecycle_policy: self.with_storage_lifecycle_policy,
             with_tags: self.with_tags,
             base_location: self.base_location,
             external_volume: self.external_volume,
@@ -588,6 +617,7 @@ impl CreateTableBuilder {
             diststyle: self.diststyle,
             distkey: self.distkey,
             sortkey: self.sortkey,
+            backup: self.backup,
         }
     }
 }
@@ -618,6 +648,7 @@ impl From<CreateTable> for CreateTableBuilder {
             transient: table.transient,
             volatile: table.volatile,
             iceberg: table.iceberg,
+            snapshot: table.snapshot,
             dynamic: table.dynamic,
             name: table.name,
             columns: table.columns,
@@ -651,6 +682,7 @@ impl From<CreateTable> for CreateTableBuilder {
             default_ddl_collation: table.default_ddl_collation,
             with_aggregation_policy: table.with_aggregation_policy,
             with_row_access_policy: table.with_row_access_policy,
+            with_storage_lifecycle_policy: table.with_storage_lifecycle_policy,
             with_tags: table.with_tags,
             base_location: table.base_location,
             external_volume: table.external_volume,
@@ -666,6 +698,7 @@ impl From<CreateTable> for CreateTableBuilder {
             diststyle: table.diststyle,
             distkey: table.distkey,
             sortkey: table.sortkey,
+            backup: table.backup,
         }
     }
 }
