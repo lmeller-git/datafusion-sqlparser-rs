@@ -446,7 +446,7 @@ fn parse_vacuum() {
                     Ident::new("tbl1"),
                 ]))
             );
-            assert_eq!(v.threshold, Some(number("20")));
+            assert_eq!(v.threshold, Some(number("20").with_empty_span()));
             assert!(v.boost);
         }
         _ => unreachable!(),
@@ -510,4 +510,10 @@ fn test_create_table_backup() {
     redshift().verified_stmt(
         "CREATE TABLE public.users_backup_test BACKUP YES DISTSTYLE AUTO AS SELECT id, name, email FROM public.users",
     );
+}
+
+#[test]
+fn test_null_treatment_inside_and_outside_window_function() {
+    redshift().verified_stmt("SELECT FIRST_VALUE(1 IGNORE NULLS) OVER () FROM (SELECT 1) t");
+    redshift().verified_stmt("SELECT FIRST_VALUE(1) IGNORE NULLS OVER () FROM (SELECT 1) t");
 }

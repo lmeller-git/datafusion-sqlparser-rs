@@ -496,7 +496,7 @@ fn parse_mssql_openjson() {
                     json_expr: Expr::CompoundIdentifier(
                         vec![Ident::new("A"), Ident::new("param"),]
                     ),
-                    json_path: Some(Value::SingleQuotedString("$.config".into())),
+                    json_path: Some(Value::SingleQuotedString("$.config".into()).with_empty_span()),
                     columns: vec![
                         OpenJsonTableColumn {
                             name: Ident::new("kind"),
@@ -658,7 +658,7 @@ fn parse_mssql_openjson() {
                     json_expr: Expr::CompoundIdentifier(
                         vec![Ident::new("A"), Ident::new("param"),]
                     ),
-                    json_path: Some(Value::SingleQuotedString("$.config".into())),
+                    json_path: Some(Value::SingleQuotedString("$.config".into()).with_empty_span()),
                     columns: vec![],
                     alias: table_alias(true, "B")
                 },
@@ -2819,6 +2819,20 @@ fn test_exec_dynamic_sql() {
     assert_eq!(stmts.len(), 2);
 }
 
+#[test]
+fn test_exec_dynamic_sql_string_concat() {
+    // EXEC with string concatenation: EXEC ('...' + @var + '...')
+    let stmts = tsql()
+        .parse_sql_statements("EXEC ('SELECT * FROM ' + @TableName + ' WHERE 1=1')")
+        .expect("EXEC with string concatenation should parse");
+    assert_eq!(stmts.len(), 1);
+    assert!(
+        matches!(&stmts[0], Statement::Execute { .. }),
+        "expected Execute, got: {:?}",
+        stmts[0]
+    );
+}
+
 // MSSQL OUTPUT clause on INSERT/UPDATE/DELETE
 // https://learn.microsoft.com/en-us/sql/t-sql/queries/output-clause-transact-sql
 #[test]
@@ -2858,5 +2872,40 @@ fn parse_mssql_update_with_output() {
 fn parse_mssql_update_with_output_into() {
     ms_and_generic().verified_stmt(
         "UPDATE employees SET salary = salary * 1.1 OUTPUT INSERTED.id, DELETED.salary, INSERTED.salary INTO @changes WHERE department = 'Engineering'",
+    );
+}
+
+#[test]
+fn parse_mssql_money_constants() {
+    ms().verified_only_select("SELECT CEILING($123.45)");
+
+    let select = ms().verified_only_select("SELECT $123.45");
+    assert_eq!(
+        &Expr::Value(Value::Placeholder("$123.45".to_string()).with_empty_span()),
+        expr_from_projection(only(&select.projection)),
+    );
+
+    let select = ms().verified_only_select("SELECT $0.99");
+    assert_eq!(
+        &Expr::Value(Value::Placeholder("$0.99".to_string()).with_empty_span()),
+        expr_from_projection(only(&select.projection)),
+    );
+
+    let select = ms().verified_only_select("SELECT $0.0");
+    assert_eq!(
+        &Expr::Value(Value::Placeholder("$0.0".to_string()).with_empty_span()),
+        expr_from_projection(only(&select.projection)),
+    );
+
+    let select = ms().verified_only_select("SELECT $123");
+    assert_eq!(
+        &Expr::Value(Value::Placeholder("$123".to_string()).with_empty_span()),
+        expr_from_projection(only(&select.projection)),
+    );
+
+    let select = ms().verified_only_select("SELECT $0");
+    assert_eq!(
+        &Expr::Value(Value::Placeholder("$0".to_string()).with_empty_span()),
+        expr_from_projection(only(&select.projection)),
     );
 }
