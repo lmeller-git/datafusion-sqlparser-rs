@@ -535,6 +535,7 @@ fn parse_update_set_from() {
             returning: None,
             output: None,
             or: None,
+            order_by: vec![],
             limit: None
         })
     );
@@ -554,6 +555,7 @@ fn parse_update_with_table_alias() {
             selection,
             returning,
             or: None,
+            order_by: _,
             limit: None,
             optimizer_hints,
             update_token: _,
@@ -2104,7 +2106,7 @@ fn parse_ilike() {
                 pattern: Box::new(Expr::Value(
                     (Value::SingleQuotedString("%a".to_string())).with_empty_span()
                 )),
-                escape_char: Some(Value::SingleQuotedString('^'.to_string())),
+                escape_char: Some(Value::SingleQuotedString('^'.to_string()).with_empty_span()),
                 any: false,
             },
             select.selection.unwrap()
@@ -2168,7 +2170,7 @@ fn parse_like() {
                 pattern: Box::new(Expr::Value(
                     (Value::SingleQuotedString("%a".to_string())).with_empty_span()
                 )),
-                escape_char: Some(Value::SingleQuotedString('^'.to_string())),
+                escape_char: Some(Value::SingleQuotedString('^'.to_string()).with_empty_span()),
                 any: false,
             },
             select.selection.unwrap()
@@ -2231,7 +2233,7 @@ fn parse_similar_to() {
                 pattern: Box::new(Expr::Value(
                     (Value::SingleQuotedString("%a".to_string())).with_empty_span()
                 )),
-                escape_char: Some(Value::SingleQuotedString('^'.to_string())),
+                escape_char: Some(Value::SingleQuotedString('^'.to_string()).with_empty_span()),
             },
             select.selection.unwrap()
         );
@@ -2248,7 +2250,7 @@ fn parse_similar_to() {
                 pattern: Box::new(Expr::Value(
                     (Value::SingleQuotedString("%a".to_string())).with_empty_span()
                 )),
-                escape_char: Some(Value::Null),
+                escape_char: Some(Value::Null.with_empty_span()),
             },
             select.selection.unwrap()
         );
@@ -2266,7 +2268,7 @@ fn parse_similar_to() {
                 pattern: Box::new(Expr::Value(
                     (Value::SingleQuotedString("%a".to_string())).with_empty_span()
                 )),
-                escape_char: Some(Value::SingleQuotedString('^'.to_string())),
+                escape_char: Some(Value::SingleQuotedString('^'.to_string()).with_empty_span()),
             })),
             select.selection.unwrap()
         );
@@ -3324,7 +3326,9 @@ fn parse_ceil_scale() {
     assert_eq!(
         &Expr::Ceil {
             expr: Box::new(Expr::Identifier(Ident::new("d"))),
-            field: CeilFloorKind::Scale(Value::Number(bigdecimal::BigDecimal::from(2), false)),
+            field: CeilFloorKind::Scale(
+                Value::Number(bigdecimal::BigDecimal::from(2), false).with_empty_span()
+            ),
         },
         expr_from_projection(only(&select.projection)),
     );
@@ -3333,7 +3337,7 @@ fn parse_ceil_scale() {
     assert_eq!(
         &Expr::Ceil {
             expr: Box::new(Expr::Identifier(Ident::new("d"))),
-            field: CeilFloorKind::Scale(Value::Number(2.to_string(), false)),
+            field: CeilFloorKind::Scale(Value::Number(2.to_string(), false).with_empty_span()),
         },
         expr_from_projection(only(&select.projection)),
     );
@@ -3348,7 +3352,9 @@ fn parse_floor_scale() {
     assert_eq!(
         &Expr::Floor {
             expr: Box::new(Expr::Identifier(Ident::new("d"))),
-            field: CeilFloorKind::Scale(Value::Number(bigdecimal::BigDecimal::from(2), false)),
+            field: CeilFloorKind::Scale(
+                Value::Number(bigdecimal::BigDecimal::from(2), false).with_empty_span()
+            ),
         },
         expr_from_projection(only(&select.projection)),
     );
@@ -3357,7 +3363,7 @@ fn parse_floor_scale() {
     assert_eq!(
         &Expr::Floor {
             expr: Box::new(Expr::Identifier(Ident::new("d"))),
-            field: CeilFloorKind::Scale(Value::Number(2.to_string(), false)),
+            field: CeilFloorKind::Scale(Value::Number(2.to_string(), false).with_empty_span()),
         },
         expr_from_projection(only(&select.projection)),
     );
@@ -12290,8 +12296,8 @@ fn parse_execute_stored_procedure() {
         }
         _ => unreachable!(),
     }
-    // Test optional parentheses around procedure name
-    ms_and_generic().one_statement_parses_to("EXEC ('name')", "EXECUTE 'name'");
+    // Parenthesised form is dynamic SQL; the expression ends up in parameters.
+    ms_and_generic().one_statement_parses_to("EXEC ('name')", "EXECUTE ('name')");
 }
 
 #[test]
@@ -13102,6 +13108,19 @@ fn test_group_by_grouping_sets() {
             ])],
             vec![]
         )
+    );
+}
+
+#[test]
+fn test_group_by_grouping_sets_bare_columns() {
+    all_dialects_where(|d| d.supports_group_by_expr()).one_statement_parses_to(
+        "SELECT a, b FROM t GROUP BY GROUPING SETS (a, b, c)",
+        "SELECT a, b FROM t GROUP BY GROUPING SETS ((a), (b), (c))",
+    );
+
+    all_dialects_where(|d| d.supports_group_by_expr()).one_statement_parses_to(
+        "SELECT a, b FROM t GROUP BY GROUPING SETS ((a, b), c)",
+        "SELECT a, b FROM t GROUP BY GROUPING SETS ((a, b), (c))",
     );
 }
 
@@ -15687,6 +15706,34 @@ fn overflow() {
     let statement = statements.pop().unwrap();
     assert_eq!(statement.to_string(), sql);
 }
+
+#[test]
+fn parse_deeply_nested_boolean_expr_does_not_stackoverflow() {
+    fn build_nested_expr(depth: usize) -> String {
+        if depth == 0 {
+            return "x = 1".to_string();
+        }
+        format!(
+            "({} OR {} AND ({}))",
+            build_nested_expr(0),
+            build_nested_expr(0),
+            build_nested_expr(depth - 1)
+        )
+    }
+
+    let depth = 200;
+    let where_clause = build_nested_expr(depth);
+    let sql = format!("SELECT pk FROM tab0 WHERE {where_clause}");
+
+    let mut statements = Parser::new(&GenericDialect {})
+        .try_with_sql(&sql)
+        .expect("tokenize to work")
+        .with_recursion_limit(depth * 10)
+        .parse_statements()
+        .unwrap();
+    let statement = statements.pop().unwrap();
+    assert_eq!(statement.to_string(), sql);
+}
 #[test]
 fn parse_select_without_projection() {
     let dialects = all_dialects_where(|d| d.supports_empty_projections());
@@ -17638,19 +17685,21 @@ fn parse_create_user() {
                     options: vec![
                         KeyValueOption {
                             option_name: "PASSWORD".to_string(),
-                            option_value: KeyValueOptionKind::Single(Value::SingleQuotedString(
-                                "secret".to_string()
-                            )),
+                            option_value: KeyValueOptionKind::Single(
+                                Value::SingleQuotedString("secret".to_string()).with_empty_span()
+                            ),
                         },
                         KeyValueOption {
                             option_name: "MUST_CHANGE_PASSWORD".to_string(),
-                            option_value: KeyValueOptionKind::Single(Value::Boolean(false)),
+                            option_value: KeyValueOptionKind::Single(
+                                Value::Boolean(false).with_empty_span()
+                            ),
                         },
                         KeyValueOption {
                             option_name: "TYPE".to_string(),
-                            option_value: KeyValueOptionKind::Single(Value::Placeholder(
-                                "SERVICE".to_string()
-                            )),
+                            option_value: KeyValueOptionKind::Single(
+                                Value::Placeholder("SERVICE".to_string()).with_empty_span()
+                            ),
                         },
                     ],
                 },
@@ -17663,15 +17712,15 @@ fn parse_create_user() {
                     options: vec![
                         KeyValueOption {
                             option_name: "t1".to_string(),
-                            option_value: KeyValueOptionKind::Single(Value::SingleQuotedString(
-                                "v1".to_string()
-                            )),
+                            option_value: KeyValueOptionKind::Single(
+                                Value::SingleQuotedString("v1".to_string()).with_empty_span()
+                            ),
                         },
                         KeyValueOption {
                             option_name: "t2".to_string(),
-                            option_value: KeyValueOptionKind::Single(Value::SingleQuotedString(
-                                "v2".to_string()
-                            )),
+                            option_value: KeyValueOptionKind::Single(
+                                Value::SingleQuotedString("v2".to_string()).with_empty_span()
+                            ),
                         },
                     ]
                 }
@@ -18297,9 +18346,9 @@ fn test_parse_alter_user() {
                 alter.set_tag.options,
                 vec![KeyValueOption {
                     option_name: "k1".to_string(),
-                    option_value: KeyValueOptionKind::Single(Value::SingleQuotedString(
-                        "v1".to_string()
-                    )),
+                    option_value: KeyValueOptionKind::Single(
+                        Value::SingleQuotedString("v1".to_string()).with_empty_span()
+                    ),
                 },]
             );
         }
@@ -18333,17 +18382,21 @@ fn test_parse_alter_user() {
                     options: vec![
                         KeyValueOption {
                             option_name: "PASSWORD".to_string(),
-                            option_value: KeyValueOptionKind::Single(Value::SingleQuotedString(
-                                "secret".to_string()
-                            )),
+                            option_value: KeyValueOptionKind::Single(
+                                Value::SingleQuotedString("secret".to_string()).with_empty_span()
+                            ),
                         },
                         KeyValueOption {
                             option_name: "MUST_CHANGE_PASSWORD".to_string(),
-                            option_value: KeyValueOptionKind::Single(Value::Boolean(true)),
+                            option_value: KeyValueOptionKind::Single(
+                                Value::Boolean(true).with_empty_span()
+                            ),
                         },
                         KeyValueOption {
                             option_name: "MINS_TO_UNLOCK".to_string(),
-                            option_value: KeyValueOptionKind::Single(number("10")),
+                            option_value: KeyValueOptionKind::Single(
+                                number("10").with_empty_span()
+                            ),
                         },
                     ]
                 }
@@ -18370,7 +18423,8 @@ fn test_parse_alter_user() {
                     option_name: "DEFAULT_SECONDARY_ROLES".to_string(),
                     option_value: KeyValueOptionKind::Multi(vec![Value::SingleQuotedString(
                         "ALL".to_string()
-                    )])
+                    )
+                    .with_empty_span()])
                 }]
             );
         }
@@ -18394,9 +18448,9 @@ fn test_parse_alter_user() {
                         options: vec![
                             KeyValueOption {
                                 option_name: "TYPE".to_string(),
-                                option_value: KeyValueOptionKind::Single(Value::Placeholder(
-                                    "AWS".to_string()
-                                )),
+                                option_value: KeyValueOptionKind::Single(
+                                    Value::Placeholder("AWS".to_string()).with_empty_span()
+                                ),
                             },
                             KeyValueOption {
                                 option_name: "ARN".to_string(),
@@ -18404,6 +18458,7 @@ fn test_parse_alter_user() {
                                     Value::SingleQuotedString(
                                         "arn:aws:iam::123456789:r1/".to_string()
                                     )
+                                    .with_empty_span()
                                 ),
                             },
                         ]
@@ -18700,4 +18755,27 @@ fn test_wildcard_func_arg() {
     );
     dialects.verified_expr("HASH(* EXCLUDE (col1))");
     dialects.verified_expr("HASH(* EXCLUDE (col1, col2))");
+}
+
+#[test]
+fn parse_select_item_multi_column_alias() {
+    all_dialects_where(|d| d.supports_select_item_multi_column_alias())
+        .verified_stmt("SELECT stack(2, 'a', 'b', 'c', 'd') AS (col1, col2)");
+
+    all_dialects_where(|d| d.supports_select_item_multi_column_alias())
+        .verified_stmt("SELECT stack(2, 'a', 'b', 'c', 'd') AS (col1, col2) FROM t");
+
+    assert!(
+        all_dialects_where(|d| !d.supports_select_item_multi_column_alias())
+            .parse_sql_statements("SELECT stack(2, 'a', 'b') AS (col1, col2)")
+            .is_err()
+    );
+}
+
+#[test]
+fn parse_non_pg_dialects_keep_xml_names_as_regular_identifiers() {
+    // On dialects that do NOT support XML expressions, bare `xml` should
+    // be treated as a regular column identifier, not a typed-string prefix.
+    let dialects = all_dialects_except(|d| d.supports_xml_expressions());
+    dialects.verified_only_select("SELECT xml FROM t");
 }

@@ -60,7 +60,8 @@ pub use self::dcl::{
     SetConfigValue, Use,
 };
 pub use self::ddl::{
-    Alignment, AlterColumnOperation, AlterConnectorOwner, AlterIndexOperation, AlterOperator,
+    Alignment, AlterColumnOperation, AlterConnectorOwner, AlterFunction, AlterFunctionAction,
+    AlterFunctionKind, AlterFunctionOperation, AlterIndexOperation, AlterOperator,
     AlterOperatorClass, AlterOperatorClassOperation, AlterOperatorFamily,
     AlterOperatorFamilyOperation, AlterOperatorOperation, AlterPolicy, AlterPolicyOperation,
     AlterSchema, AlterSchemaOperation, AlterTable, AlterTableAlgorithm, AlterTableLock,
@@ -624,9 +625,9 @@ impl fmt::Display for MapEntry {
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum CastFormat {
     /// A simple cast format specified by a `Value`.
-    Value(Value),
+    Value(ValueWithSpan),
     /// A cast format with an explicit time zone: `(format, timezone)`.
-    ValueAtTimeZone(Value, Value),
+    ValueAtTimeZone(ValueWithSpan, ValueWithSpan),
 }
 
 /// An element of a JSON path.
@@ -778,7 +779,7 @@ pub enum CeilFloorKind {
     /// `CEIL( <expr> TO <DateTimeField>)`
     DateTimeField(DateTimeField),
     /// `CEIL( <expr> [, <scale>])`
-    Scale(Value),
+    Scale(ValueWithSpan),
 }
 
 /// A WHEN clause in a CASE expression containing both
@@ -956,7 +957,7 @@ pub enum Expr {
         /// Pattern expression.
         pattern: Box<Expr>,
         /// Optional escape character.
-        escape_char: Option<Value>,
+        escape_char: Option<ValueWithSpan>,
     },
     /// `ILIKE` (case-insensitive `LIKE`)
     ILike {
@@ -970,7 +971,7 @@ pub enum Expr {
         /// Pattern expression.
         pattern: Box<Expr>,
         /// Optional escape character.
-        escape_char: Option<Value>,
+        escape_char: Option<ValueWithSpan>,
     },
     /// `SIMILAR TO` regex
     SimilarTo {
@@ -981,7 +982,7 @@ pub enum Expr {
         /// Pattern expression.
         pattern: Box<Expr>,
         /// Optional escape character.
-        escape_char: Option<Value>,
+        escape_char: Option<ValueWithSpan>,
     },
     /// MySQL: `RLIKE` regex or `REGEXP` regex
     RLike {
@@ -1146,12 +1147,12 @@ pub enum Expr {
     /// TRIM(<expr>, [, characters]) -- PostgreSQL, DuckDB, Snowflake, BigQuery, Generic
     /// ```
     Trim {
-        /// The expression to trim from.
-        expr: Box<Expr>,
         /// Which side to trim: `BOTH`, `LEADING`, or `TRAILING`.
         trim_where: Option<TrimWhereField>,
-        /// Optional expression specifying what to trim from the value.
+        /// Optional expression specifying what to trim from the value `expr`.
         trim_what: Option<Box<Expr>>,
+        /// The expression to trim from.
+        expr: Box<Expr>,
         /// Optional list of characters to trim (dialect-specific).
         trim_characters: Option<Vec<Expr>>,
     },
@@ -1292,7 +1293,7 @@ pub enum Expr {
         /// `(<col>, <col>, ...)`.
         columns: Vec<ObjectName>,
         /// `<expr>`.
-        match_value: Value,
+        match_value: ValueWithSpan,
         /// `<search modifier>`
         opt_search_modifier: Option<SearchModifier>,
     },
@@ -3295,7 +3296,7 @@ pub enum Set {
         /// Transaction modes (e.g., ISOLATION LEVEL, READ ONLY).
         modes: Vec<TransactionMode>,
         /// Optional snapshot value for transaction snapshot control.
-        snapshot: Option<Value>,
+        snapshot: Option<ValueWithSpan>,
         /// `true` when the `SESSION` keyword was used.
         session: bool,
     },
@@ -3751,6 +3752,13 @@ pub enum Statement {
         with_options: Vec<SqlOption>,
     },
     /// ```sql
+    /// ALTER FUNCTION
+    /// ALTER AGGREGATE
+    /// ```
+    /// See [PostgreSQL](https://www.postgresql.org/docs/current/sql-alterfunction.html)
+    /// and [PostgreSQL](https://www.postgresql.org/docs/current/sql-alteraggregate.html)
+    AlterFunction(AlterFunction),
+    /// ```sql
     /// ALTER TYPE
     /// See [PostgreSQL](https://www.postgresql.org/docs/current/sql-altertype.html)
     /// ```
@@ -4096,6 +4104,15 @@ pub enum Statement {
         history: bool,
         /// Additional options for `SHOW DATABASES`.
         show_options: ShowStatementOptions,
+    },
+    /// ```sql
+    /// SHOW [FULL] PROCESSLIST
+    /// ```
+    ///
+    /// Note: this is a MySQL-specific statement.
+    ShowProcessList {
+        /// `true` when full process information was requested.
+        full: bool,
     },
     /// ```sql
     /// SHOW SCHEMAS
@@ -4456,7 +4473,7 @@ pub enum Statement {
         name: Option<ObjectName>,
         /// Parameter expressions passed to execute.
         parameters: Vec<Expr>,
-        /// Whether parentheses were present.
+        /// Whether parentheses were present around `parameters`.
         has_parentheses: bool,
         /// Is this an `EXECUTE IMMEDIATE`.
         immediate: bool,
@@ -4630,7 +4647,7 @@ pub enum Statement {
         /// Pragma name (possibly qualified).
         name: ObjectName,
         /// Optional pragma value.
-        value: Option<Value>,
+        value: Option<ValueWithSpan>,
         /// Whether the pragma used `=`.
         is_eq: bool,
     },
@@ -5486,6 +5503,7 @@ impl fmt::Display for Statement {
                 }
                 write!(f, " AS {query}")
             }
+            Statement::AlterFunction(alter_function) => write!(f, "{alter_function}"),
             Statement::AlterType(AlterType { name, operation }) => {
                 write!(f, "ALTER TYPE {name} {operation}")
             }
@@ -5710,6 +5728,14 @@ impl fmt::Display for Statement {
                 )?;
                 Ok(())
             }
+            Statement::ShowProcessList { full } => {
+                write!(
+                    f,
+                    "SHOW {full}PROCESSLIST",
+                    full = if *full { "FULL " } else { "" },
+                )?;
+                Ok(())
+            }
             Statement::ShowSchemas {
                 terse,
                 history,
@@ -5911,7 +5937,8 @@ impl fmt::Display for Statement {
                 default,
             } => {
                 let (open, close) = if *has_parentheses {
-                    ("(", ")")
+                    // Space before `(` only when there is no name directly preceding it.
+                    (if name.is_some() { "(" } else { " (" }, ")")
                 } else {
                     (if parameters.is_empty() { "" } else { " " }, "")
                 };
@@ -6752,7 +6779,7 @@ pub enum FetchDirection {
     /// Fetch a specific count of rows.
     Count {
         /// The limit value for the count.
-        limit: Value,
+        limit: ValueWithSpan,
     },
     /// Fetch the next row.
     Next,
@@ -6765,12 +6792,12 @@ pub enum FetchDirection {
     /// Fetch an absolute row by index.
     Absolute {
         /// The absolute index value.
-        limit: Value,
+        limit: ValueWithSpan,
     },
     /// Fetch a row relative to the current position.
     Relative {
         /// The relative offset value.
-        limit: Value,
+        limit: ValueWithSpan,
     },
     /// Fetch all rows.
     All,
@@ -6779,7 +6806,7 @@ pub enum FetchDirection {
     /// Fetch forward by an optional limit.
     Forward {
         /// Optional forward limit.
-        limit: Option<Value>,
+        limit: Option<ValueWithSpan>,
     },
     /// Fetch all forward rows.
     ForwardAll,
@@ -6788,7 +6815,7 @@ pub enum FetchDirection {
     /// Fetch backward by an optional limit.
     Backward {
         /// Optional backward limit.
-        limit: Option<Value>,
+        limit: Option<ValueWithSpan>,
     },
     /// Fetch all backward rows.
     BackwardAll,
@@ -8116,7 +8143,7 @@ pub enum FunctionArgumentClause {
     /// The `SEPARATOR` clause to the [`GROUP_CONCAT`] function in MySQL.
     ///
     /// [`GROUP_CONCAT`]: https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html#function_group-concat
-    Separator(Value),
+    Separator(ValueWithSpan),
     /// The `ON NULL` clause for some JSON functions.
     ///
     /// [MSSQL `JSON_ARRAY`](https://learn.microsoft.com/en-us/sql/t-sql/functions/json-array-transact-sql?view=sql-server-ver16)
@@ -9465,7 +9492,7 @@ impl fmt::Display for CopyLegacyOption {
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct FileSize {
     /// Numeric size value.
-    pub size: Value,
+    pub size: ValueWithSpan,
     /// Optional unit for the size (MB or GB).
     pub unit: Option<FileSizeUnit>,
 }
@@ -9814,6 +9841,8 @@ pub enum ArgMode {
     Out,
     /// `INOUT` mode.
     InOut,
+    /// `VARIADIC` mode.
+    Variadic,
 }
 
 impl fmt::Display for ArgMode {
@@ -9822,6 +9851,7 @@ impl fmt::Display for ArgMode {
             ArgMode::In => write!(f, "IN"),
             ArgMode::Out => write!(f, "OUT"),
             ArgMode::InOut => write!(f, "INOUT"),
+            ArgMode::Variadic => write!(f, "VARIADIC"),
         }
     }
 }
@@ -9878,6 +9908,8 @@ impl fmt::Display for FunctionSecurity {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum FunctionSetValue {
+    /// SET param = DEFAULT / SET param TO DEFAULT
+    Default,
     /// SET param = value1, value2, ...
     Values(Vec<Expr>),
     /// SET param FROM CURRENT
@@ -9892,7 +9924,7 @@ pub enum FunctionSetValue {
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct FunctionDefinitionSetParam {
     /// The name of the configuration parameter.
-    pub name: Ident,
+    pub name: ObjectName,
     /// The value to set for the parameter.
     pub value: FunctionSetValue,
 }
@@ -9901,6 +9933,7 @@ impl fmt::Display for FunctionDefinitionSetParam {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "SET {} ", self.name)?;
         match &self.value {
+            FunctionSetValue::Default => write!(f, "= DEFAULT"),
             FunctionSetValue::Values(values) => {
                 write!(f, "= {}", display_comma_separated(values))
             }
@@ -10654,11 +10687,11 @@ pub struct ShowStatementOptions {
     /// Optional scope to show in (for example: TABLE, SCHEMA).
     pub show_in: Option<ShowStatementIn>,
     /// Optional `STARTS WITH` filter value.
-    pub starts_with: Option<Value>,
+    pub starts_with: Option<ValueWithSpan>,
     /// Optional `LIMIT` expression.
     pub limit: Option<Expr>,
     /// Optional `FROM` value used with `LIMIT`.
-    pub limit_from: Option<Value>,
+    pub limit_from: Option<ValueWithSpan>,
     /// Optional filter position (infix or suffix) for `LIKE`/`FILTER`.
     pub filter_position: Option<ShowStatementFilterPosition>,
 }
@@ -11474,7 +11507,7 @@ pub struct AlterUserRemoveRoleDelegation {
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct AlterUserAddMfaMethodOtp {
     /// Optional OTP count parameter.
-    pub count: Option<Value>,
+    pub count: Option<ValueWithSpan>,
 }
 
 /// ```sql
@@ -11795,7 +11828,7 @@ pub struct VacuumStatement {
     /// Optional table to run `VACUUM` on.
     pub table_name: Option<ObjectName>,
     /// Optional threshold value (percent) for `TO threshold PERCENT`.
-    pub threshold: Option<Value>,
+    pub threshold: Option<ValueWithSpan>,
     /// Whether `BOOST` was specified.
     pub boost: bool,
 }
@@ -12077,6 +12110,12 @@ impl From<CreateOperatorClass> for Statement {
 impl From<AlterSchema> for Statement {
     fn from(a: AlterSchema) -> Self {
         Self::AlterSchema(a)
+    }
+}
+
+impl From<AlterFunction> for Statement {
+    fn from(a: AlterFunction) -> Self {
+        Self::AlterFunction(a)
     }
 }
 
