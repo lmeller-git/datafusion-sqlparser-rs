@@ -1295,16 +1295,29 @@ fn parse_select_wildcard_with_alias() {
     dialects
         .parse_sql_statements("SELECT t.* AS all_cols FROM t")
         .unwrap();
+    dialects.one_statement_parses_to(
+        "SELECT t.* all_cols FROM t",
+        "SELECT t.* AS all_cols FROM t",
+    );
+    dialects.one_statement_parses_to(
+        "SELECT t.* all_cols, other_col FROM t",
+        "SELECT t.* AS all_cols, other_col FROM t",
+    );
 
     // unqualified wildcard with alias
     dialects
         .parse_sql_statements("SELECT * AS all_cols FROM t")
         .unwrap();
+    dialects.one_statement_parses_to("SELECT * all_cols FROM t", "SELECT * AS all_cols FROM t");
 
     // mixed: regular column + qualified wildcard with alias
     dialects
         .parse_sql_statements("SELECT a.id, b.* AS b_cols FROM a JOIN b ON (a.id = b.a_id)")
         .unwrap();
+    dialects.one_statement_parses_to(
+        "SELECT a.id, b.* b_cols FROM a JOIN b ON (a.id = b.a_id)",
+        "SELECT a.id, b.* AS b_cols FROM a JOIN b ON (a.id = b.a_id)",
+    );
 }
 
 #[test]
@@ -9015,6 +9028,7 @@ fn lateral_function() {
                             vec![Ident::new("customer"), Ident::new("id")],
                         ))),
                     ],
+                    with_ordinality: false,
                     alias: None,
                 },
                 global: false,
@@ -14759,6 +14773,7 @@ fn parse_method_expr() {
 fn test_show_dbs_schemas_tables_views() {
     // These statements are parsed the same by all dialects
     let stmts = vec![
+        "SHOW CATALOGS",
         "SHOW DATABASES",
         "SHOW SCHEMAS",
         "SHOW TABLES",
@@ -14776,7 +14791,11 @@ fn test_show_dbs_schemas_tables_views() {
     // These statements are parsed the same by all dialects
     // except for how the parser interprets the location of
     // LIKE option (infix/suffix)
-    let stmts = vec!["SHOW DATABASES LIKE '%abc'", "SHOW SCHEMAS LIKE '%abc'"];
+    let stmts = vec![
+        "SHOW CATALOGS LIKE '%abc'",
+        "SHOW DATABASES LIKE '%abc'",
+        "SHOW SCHEMAS LIKE '%abc'",
+    ];
     for stmt in stmts {
         all_dialects_where(|d| d.supports_show_like_before_in()).verified_stmt(stmt);
         all_dialects_where(|d| !d.supports_show_like_before_in()).verified_stmt(stmt);
@@ -15294,6 +15313,7 @@ fn parse_comments() {
 
     // https://www.postgresql.org/docs/current/sql-comment.html
     let object_types = [
+        ("COLLATION", CommentObject::Collation),
         ("COLUMN", CommentObject::Column),
         ("DATABASE", CommentObject::Database),
         ("DOMAIN", CommentObject::Domain),
@@ -16204,8 +16224,35 @@ fn test_select_from_first() {
             pipe_operators: vec![],
         };
         assert_eq!(expected, ast);
-        assert_eq!(ast.to_string(), q);
     }
+}
+
+#[test]
+fn test_select_from_first_with_cte() {
+    let dialects = all_dialects_where(|d| d.supports_from_first_select());
+    let q = "WITH test AS (FROM t SELECT a) FROM test SELECT 1";
+
+    let ast = dialects.verified_query(q);
+
+    let ast_select = ast.body.as_select().unwrap();
+
+    let expected_body_select_projection =
+        vec![SelectItem::UnnamedExpr(Expr::Value(ValueWithSpan {
+            value: test_utils::number("1"),
+            span: Span::empty(),
+        }))];
+
+    let expected_body_from = vec![TableWithJoins {
+        relation: table_from_name(ObjectName::from(vec![Ident {
+            value: "test".to_string(),
+            quote_style: None,
+            span: Span::empty(),
+        }])),
+        joins: vec![],
+    }];
+
+    assert_eq!(ast_select.projection, expected_body_select_projection);
+    assert_eq!(ast_select.from, expected_body_from);
 }
 
 #[test]
