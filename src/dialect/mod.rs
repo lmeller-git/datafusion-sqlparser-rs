@@ -28,6 +28,7 @@ mod oracle;
 mod postgresql;
 mod redshift;
 mod snowflake;
+mod spark;
 mod sqlite;
 
 use core::any::{Any, TypeId};
@@ -51,6 +52,7 @@ pub use self::postgresql::PostgreSqlDialect;
 pub use self::redshift::RedshiftSqlDialect;
 pub use self::snowflake::parse_snowflake_stage_name;
 pub use self::snowflake::SnowflakeDialect;
+pub use self::spark::SparkSqlDialect;
 pub use self::sqlite::SQLiteDialect;
 
 /// Macro for streamlining the creation of derived `Dialect` objects.
@@ -655,6 +657,21 @@ pub trait Dialect: Debug + Any {
     /// SELECT *
     /// ```
     fn supports_from_first_select(&self) -> bool {
+        false
+    }
+
+    /// Return true if the dialect supports "FROM-first" inserts.
+    ///
+    /// Example:
+    /// ```sql
+    /// WITH cte AS (SELECT key FROM src)
+    /// FROM cte
+    /// INSERT OVERWRITE table my_table
+    /// SELECT *
+    ///
+    /// See <https://hive.apache.org/docs/latest/language/common-table-expression/>
+    /// ```
+    fn supports_from_first_insert(&self) -> bool {
         false
     }
 
@@ -1556,10 +1573,9 @@ pub trait Dialect: Debug + Any {
     ///
     /// Example:
     /// ```sql
+    /// SELECT t.* alias FROM t
     /// SELECT t.* AS alias FROM t
     /// ```
-    ///
-    /// [Redshift](https://docs.aws.amazon.com/redshift/latest/dg/r_SELECT_list.html)
     fn supports_select_wildcard_with_alias(&self) -> bool {
         false
     }
@@ -1713,6 +1729,42 @@ pub trait Dialect: Debug + Any {
     fn supports_xml_expressions(&self) -> bool {
         false
     }
+
+    /// Returns true if the dialect supports `USING <format>` in `CREATE TABLE`.
+    ///
+    /// Example:
+    /// ```sql
+    /// CREATE TABLE t (i INT) USING PARQUET
+    /// ```
+    ///
+    /// [Spark SQL](https://spark.apache.org/docs/latest/sql-ref-syntax-ddl-create-table-datasource.html)
+    fn supports_create_table_using(&self) -> bool {
+        false
+    }
+
+    /// Returns true if the dialect treats `LONG` as an alias for `BIGINT`.
+    ///
+    /// Example:
+    /// ```sql
+    /// CREATE TABLE t (id LONG)
+    /// ```
+    ///
+    /// [Spark SQL](https://spark.apache.org/docs/latest/sql-ref-datatypes.html)
+    fn supports_long_type_as_bigint(&self) -> bool {
+        false
+    }
+
+    /// Returns true if the dialect supports `MAP<K, V>` angle-bracket syntax for the MAP data type.
+    ///
+    /// Example:
+    /// ```sql
+    /// CREATE TABLE t (m MAP<STRING, INT>)
+    /// ```
+    ///
+    /// [Spark SQL](https://spark.apache.org/docs/latest/sql-ref-datatypes.html)
+    fn supports_map_literal_with_angle_brackets(&self) -> bool {
+        false
+    }
 }
 
 /// Operators for which precedence must be defined.
@@ -1787,6 +1839,7 @@ pub fn dialect_from_str(dialect_name: impl AsRef<str>) -> Option<Box<dyn Dialect
         "ansi" => Some(Box::new(AnsiDialect {})),
         "duckdb" => Some(Box::new(DuckDbDialect {})),
         "databricks" => Some(Box::new(DatabricksDialect {})),
+        "spark" | "sparksql" => Some(Box::new(SparkSqlDialect {})),
         "oracle" => Some(Box::new(OracleDialect {})),
         _ => None,
     }
