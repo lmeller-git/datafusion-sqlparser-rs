@@ -40,6 +40,7 @@ use super::{
 /// INSERT statement.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct Insert {
     /// Token for the `INSERT` keyword (or its substitutes)
@@ -278,6 +279,7 @@ impl Display for Insert {
 /// DELETE statement.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct Delete {
     /// Token for the `DELETE` keyword
@@ -363,6 +365,7 @@ impl Display for Delete {
 /// UPDATE statement.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct Update {
     /// Token for the `UPDATE` keyword
@@ -453,6 +456,7 @@ impl Display for Update {
 /// A `MERGE` statement.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct Merge {
     /// The `MERGE` token that starts the statement.
@@ -509,6 +513,7 @@ impl Display for Merge {
 /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#merge_statement)
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct MergeClause {
     /// The `WHEN` token that starts the sub-expression.
@@ -548,6 +553,7 @@ impl Display for MergeClause {
 /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#merge_statement)
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum MergeClauseKind {
     /// `WHEN MATCHED`
@@ -587,6 +593,7 @@ impl Display for MergeClauseKind {
 /// [Oracle](https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/MERGE.html)
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum MergeAction {
     /// An `INSERT` clause
@@ -632,6 +639,7 @@ impl Display for MergeAction {
 /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#merge_statement)
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum MergeInsertKind {
     /// The insert expression is defined from an explicit `VALUES` clause
@@ -677,6 +685,7 @@ impl Display for MergeInsertKind {
 /// [Oracle](https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/MERGE.html)
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct MergeInsertExpr {
     /// The `INSERT` token that starts the sub-expression.
@@ -722,6 +731,7 @@ impl Display for MergeInsertExpr {
 /// [Oracle](https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/MERGE.html)
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct MergeUpdateExpr {
     /// The `UPDATE` token that starts the sub-expression.
@@ -754,6 +764,7 @@ impl Display for MergeUpdateExpr {
 /// <https://learn.microsoft.com/en-us/sql/t-sql/queries/output-clause-transact-sql>
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum OutputClause {
     /// `OUTPUT` clause
@@ -811,6 +822,7 @@ impl fmt::Display for OutputClause {
 /// ```
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct MultiTableInsertWhenClause {
     /// The condition for this WHEN clause
@@ -838,6 +850,7 @@ impl Display for MultiTableInsertWhenClause {
 /// ```
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct MultiTableInsertIntoClause {
     /// The target table
@@ -864,6 +877,7 @@ impl Display for MultiTableInsertIntoClause {
 /// The VALUES clause in a multi-table INSERT INTO clause.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct MultiTableInsertValues {
     /// The values to insert (can be column references, DEFAULT, or NULL)
@@ -873,6 +887,7 @@ pub struct MultiTableInsertValues {
 /// A value in a multi-table INSERT VALUES clause.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum MultiTableInsertValue {
     /// A column reference or expression from the source
@@ -895,6 +910,7 @@ impl Display for MultiTableInsertValue {
 /// See: <https://docs.snowflake.com/en/sql-reference/sql/insert-multi-table>
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum MultiTableInsertType {
     /// `INSERT ALL` - all matching WHEN clauses are executed

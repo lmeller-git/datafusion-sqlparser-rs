@@ -54,6 +54,7 @@ use crate::{
 /// SQL Token enumeration
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum Token {
     /// An end-of-file marker, not a real token
@@ -454,6 +455,7 @@ fn keyword_lookup(word: &str, quote_style: Option<char>) -> Keyword {
 /// A keyword (like SELECT) or an optionally quoted SQL identifier
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct Word {
     /// The value of the token, without the enclosing quotes, and with the
@@ -494,6 +496,7 @@ impl Word {
 /// Represents whitespace in the input: spaces, newlines, tabs and comments.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum Whitespace {
     /// A single space character.
@@ -548,6 +551,7 @@ impl fmt::Display for Whitespace {
 /// ```
 #[derive(Eq, PartialEq, Hash, Clone, Copy, Ord, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct Location {
     /// Line number, starting from 1.
@@ -611,6 +615,7 @@ impl From<(u64, u64)> for Location {
 /// See [Spanned](crate::ast::Spanned) for more information.
 #[derive(Eq, PartialEq, Hash, Clone, PartialOrd, Ord, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct Span {
     /// Start `Location` (inclusive).
@@ -736,6 +741,7 @@ pub type TokenWithLocation = TokenWithSpan;
 /// ```
 #[derive(Debug, Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 /// A `Token` together with its `Span` (location in the source).
 pub struct TokenWithSpan {

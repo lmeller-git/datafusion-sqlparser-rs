@@ -40,6 +40,7 @@ use crate::tokenizer::Span;
 /// <https://www.postgresql.org/docs/current/sql-createrole.html>
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum RoleOption {
     /// Enable or disable BYPASSRLS.
@@ -115,6 +116,7 @@ impl fmt::Display for RoleOption {
 /// * SET `configuration_parameter` FROM CURRENT
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum SetConfigValue {
     /// Use the default value.
@@ -130,6 +132,7 @@ pub enum SetConfigValue {
 /// * RESET ALL
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum ResetConfig {
     /// Reset all configuration parameters.
@@ -141,6 +144,7 @@ pub enum ResetConfig {
 /// An `ALTER ROLE` (`Statement::AlterRole`) operation
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum AlterRoleOperation {
     /// Generic
@@ -241,6 +245,7 @@ impl fmt::Display for AlterRoleOperation {
 /// A `USE` (`Statement::Use`) operation
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum Use {
     /// Switch to the given catalog (e.g. `USE CATALOG ...`).
@@ -283,6 +288,7 @@ impl fmt::Display for Use {
 /// See: <https://docs.snowflake.com/en/sql-reference/sql/use-secondary-roles>
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum SecondaryRoles {
     /// Use all secondary roles.
@@ -307,6 +313,7 @@ impl fmt::Display for SecondaryRoles {
 /// See [PostgreSQL](https://www.postgresql.org/docs/current/sql-createrole.html)
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct CreateRole {
     /// Role names to create.
@@ -434,6 +441,7 @@ impl Spanned for CreateRole {
 /// GRANT privileges ON objects TO grantees
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct Grant {
     /// Privileges being granted.
@@ -488,6 +496,7 @@ impl From<Grant> for crate::ast::Statement {
 /// REVOKE privileges ON objects FROM grantees
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct Revoke {
     /// Privileges to revoke.

@@ -31,6 +31,7 @@ use super::{value::escape_single_quote_string, ColumnDef};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 /// A member of an ENUM type.
 pub enum EnumMember {
@@ -45,6 +46,7 @@ pub enum EnumMember {
 /// SQL data types
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum DataType {
     /// Table type in [PostgreSQL], e.g. CREATE FUNCTION RETURNS TABLE(...).
@@ -896,6 +898,7 @@ fn format_clickhouse_datetime_precision_and_timezone(
 /// Type of brackets used for `STRUCT` literals.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum StructBracketKind {
     /// Example: `STRUCT(a INT, b STRING)`
@@ -910,6 +913,7 @@ pub enum StructBracketKind {
 /// guarantee compatibility with the input query we must maintain its exact information.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum TimezoneInfo {
     /// No information about time zone, e.g. TIMESTAMP
@@ -957,6 +961,7 @@ impl fmt::Display for TimezoneInfo {
 /// [Postgres]: https://www.postgresql.org/docs/17/datatype-datetime.html
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum IntervalFields {
     /// `YEAR` field
@@ -1013,6 +1018,7 @@ impl fmt::Display for IntervalFields {
 /// [SQL Standard]: https://jakewheat.github.io/sql-overview/sql-2016-foundation-grammar.html#exact-numeric-type
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum ExactNumberInfo {
     /// No additional information, e.g. `DECIMAL`.
@@ -1044,6 +1050,7 @@ impl fmt::Display for ExactNumberInfo {
 /// [1]: https://jakewheat.github.io/sql-overview/sql-2016-foundation-grammar.html#character-length
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum CharacterLength {
     /// Integer length with optional unit (e.g. `CHAR(10)` or `VARCHAR(10 CHARACTERS)`).
@@ -1079,6 +1086,7 @@ impl fmt::Display for CharacterLength {
 /// [1]: https://jakewheat.github.io/sql-overview/sql-2016-foundation-grammar.html#char-length-units
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum CharLengthUnits {
     /// CHARACTERS unit
@@ -1102,6 +1110,7 @@ impl fmt::Display for CharLengthUnits {
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 /// Information about [binary length][1], including length and possibly unit.
 ///
@@ -1136,6 +1145,7 @@ impl fmt::Display for BinaryLength {
 /// For example: Bigquery/Hive use `ARRAY<INT>` whereas snowflake uses ARRAY.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum ArrayElemTypeDef {
     /// Use `ARRAY` style without an explicit element type.
@@ -1154,6 +1164,7 @@ pub enum ArrayElemTypeDef {
 /// [PostgreSQL]: https://www.postgresql.org/docs/9.5/functions-geometry.html
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum GeometricTypeKind {
     /// Point geometry

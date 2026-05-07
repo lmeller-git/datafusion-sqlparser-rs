@@ -33,6 +33,7 @@ use sqlparser_derive::{Visit, VisitMut};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 /// Parameters for a named stage object used in data loading/unloading.
 pub struct StageParamsObject {
@@ -52,6 +53,7 @@ pub struct StageParamsObject {
 /// and Snowflake-specific ones for data loading.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum StageLoadSelectItemKind {
     /// A standard SQL select item expression.
@@ -71,6 +73,7 @@ impl fmt::Display for StageLoadSelectItemKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 /// A single item in the `SELECT` list for data loading from staged files.
 pub struct StageLoadSelectItem {
@@ -128,6 +131,7 @@ impl fmt::Display for StageLoadSelectItem {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 /// A command to stage files to a named stage.
 pub struct FileStagingCommand {

@@ -33,6 +33,7 @@ use crate::ast::{display_comma_separated, display_separated, ValueWithSpan};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 /// A collection of key-value options.
 pub struct KeyValueOptions {
@@ -44,6 +45,7 @@ pub struct KeyValueOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 /// The delimiter used between key-value options.
 pub enum KeyValueOptionsDelimiter {
@@ -55,6 +57,7 @@ pub enum KeyValueOptionsDelimiter {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 /// A single key-value option.
 pub struct KeyValueOption {
@@ -71,6 +74,7 @@ pub struct KeyValueOption {
 /// `Value::Placeholder("SMS".to_string)`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 /// The kind of value for a key-value option.
 pub enum KeyValueOptionKind {

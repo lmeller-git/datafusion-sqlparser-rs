@@ -21,6 +21,7 @@ use super::*;
 /// This specifies whether the trigger function should be fired once for every row affected by the trigger event, or just once per SQL statement.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum TriggerObject {
     /// The trigger fires once for each row affected by the triggering event
@@ -40,6 +41,7 @@ impl fmt::Display for TriggerObject {
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 /// This clause indicates whether the following relation name is for the before-image transition relation or the after-image transition relation
 pub enum TriggerReferencingType {
@@ -61,6 +63,7 @@ impl fmt::Display for TriggerReferencingType {
 /// This keyword immediately precedes the declaration of one or two relation names that provide access to the transition relations of the triggering statement
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct TriggerReferencing {
     /// The referencing type (`OLD TABLE` or `NEW TABLE`).
@@ -86,6 +89,7 @@ impl fmt::Display for TriggerReferencing {
 /// Used to describe trigger events
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum TriggerEvent {
     /// Trigger on INSERT event
@@ -119,6 +123,7 @@ impl fmt::Display for TriggerEvent {
 /// Trigger period
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum TriggerPeriod {
     /// The trigger fires once for each row affected by the triggering event
@@ -145,6 +150,7 @@ impl fmt::Display for TriggerPeriod {
 /// Types of trigger body execution body.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub enum TriggerExecBodyType {
     /// Execute a function
@@ -164,6 +170,7 @@ impl fmt::Display for TriggerExecBodyType {
 /// This keyword immediately precedes the declaration of one or two relation names that provide access to the transition relations of the triggering statement
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct TriggerExecBody {
     /// Whether the body is a `FUNCTION` or `PROCEDURE` invocation.
