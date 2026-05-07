@@ -298,6 +298,12 @@ impl fmt::Display for SetQuantifier {
     }
 }
 
+#[cfg(feature = "arbitrary-derive")]
+fn always_some_table_name(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Option<String>> {
+    let name: String = u.arbitrary()?;
+    Ok(Some(name))
+}
+
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
@@ -306,6 +312,7 @@ impl fmt::Display for SetQuantifier {
 /// A (possibly schema-qualified) table reference used in `FROM` clauses.
 pub struct Table {
     /// Optional table name (absent for e.g. `TABLE` command without argument).
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = always_some_table_name))]
     pub table_name: Option<String>,
     /// Optional schema/catalog name qualifying the table.
     pub schema_name: Option<String>,
@@ -318,10 +325,14 @@ impl fmt::Display for Table {
                 f,
                 "TABLE {}.{}",
                 schema_name,
-                self.table_name.as_ref().unwrap(),
+                self.table_name.as_ref().unwrap_or(&"FOO".into()),
             )?;
         } else {
-            write!(f, "TABLE {}", self.table_name.as_ref().unwrap(),)?;
+            write!(
+                f,
+                "TABLE {}",
+                self.table_name.as_ref().unwrap_or(&"FOO".into()),
+            )?;
         }
         Ok(())
     }

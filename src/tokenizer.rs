@@ -452,6 +452,12 @@ fn keyword_lookup(word: &str, quote_style: Option<char>) -> Keyword {
         .map_or(Keyword::NoKeyword, |x| ALL_KEYWORDS_INDEX[x])
 }
 
+#[cfg(feature = "arbitrary-derive")]
+fn arbitrary_quote_style(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Option<char>> {
+    let choices = [None, Some('"'), Some('`'), Some('[')];
+    Ok(*u.choose(&choices)?)
+}
+
 /// A keyword (like SELECT) or an optionally quoted SQL identifier
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -464,6 +470,7 @@ pub struct Word {
     /// An identifier can be "quoted" (&lt;delimited identifier> in ANSI parlance).
     /// The standard and most implementations allow using double quotes for this,
     /// but some implementations support other quoting styles as well (e.g. \[MS SQL])
+    #[cfg_attr(feature =  "arbitrary-derive", arbitrary(with = arbitrary_quote_style))]
     pub quote_style: Option<char>,
     /// If the word was not quoted and it matched one of the known keywords,
     /// this will have one of the values from dialect::keywords, otherwise empty

@@ -200,6 +200,13 @@ fn format_statement_list(f: &mut fmt::Formatter, statements: &[Statement]) -> fm
     write!(f, ";")
 }
 
+#[cfg(feature = "arbitrary-derive")]
+/// Any valid qoute style for Idents
+fn arbitrary_quote_style_ident(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Option<char>> {
+    let choices = [None, Some('\''), Some('"'), Some('`'), Some('[')];
+    Ok(*u.choose(&choices)?)
+}
+
 /// An identifier, decomposed into its value or character data and the quote style.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -210,6 +217,10 @@ pub struct Ident {
     pub value: String,
     /// The starting quote if any. Valid quote characters are the single quote,
     /// double quote, backtick, and opening square bracket.
+    #[cfg_attr(
+        feature = "arbitrary-derive",
+        arbitrary(with = arbitrary_quote_style_ident)
+    )]
     pub quote_style: Option<char>,
     /// The span of the identifier in the original SQL string.
     pub span: Span,
@@ -463,7 +474,6 @@ impl fmt::Display for Array {
 /// so the user will have to reject intervals like `HOUR TO YEAR`.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct Interval {
     /// The interval value expression (commonly a string literal).
@@ -478,6 +488,35 @@ pub struct Interval {
     ///
     /// See SQL `SECOND(n)` or `SECOND(m, n)` forms.
     pub fractional_seconds_precision: Option<u64>,
+}
+
+#[cfg(feature = "arbitrary-derive")]
+impl<'a> arbitrary::Arbitrary<'a> for Interval {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let value = Box::<Expr>::arbitrary(u)?;
+        let leading_field = Option::<DateTimeField>::arbitrary(u)?;
+        let leading_precision = Option::<u64>::arbitrary(u)?;
+        let fractional_seconds_precision = Option::<u64>::arbitrary(u)?;
+
+        // When the leading field is SECOND, the parser guarantees that
+        // the last field is None.
+        let last_field = match (
+            &leading_field,
+            leading_precision,
+            fractional_seconds_precision,
+        ) {
+            (Some(DateTimeField::Second), Some(_), Some(_)) => None,
+            _ => Option::<DateTimeField>::arbitrary(u)?,
+        };
+
+        Ok(Interval {
+            value,
+            leading_field,
+            leading_precision,
+            last_field,
+            fractional_seconds_precision,
+        })
+    }
 }
 
 impl fmt::Display for Interval {
