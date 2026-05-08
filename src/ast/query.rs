@@ -22,6 +22,9 @@ use helpers::attached_token::AttachedToken;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "arbitrary-derive")]
+use crate::ast::{optional_sql_safe_string, sql_safe_string};
+
 #[cfg(feature = "visitor")]
 use sqlparser_derive::{Visit, VisitMut};
 
@@ -300,7 +303,7 @@ impl fmt::Display for SetQuantifier {
 
 #[cfg(feature = "arbitrary-derive")]
 fn always_some_table_name(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Option<String>> {
-    let name: String = u.arbitrary()?;
+    let name: String = sql_safe_string(u)?;
     Ok(Some(name))
 }
 
@@ -315,6 +318,7 @@ pub struct Table {
     #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = always_some_table_name))]
     pub table_name: Option<String>,
     /// Optional schema/catalog name qualifying the table.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub schema_name: Option<String>,
 }
 
@@ -1028,6 +1032,7 @@ impl fmt::Display for WildcardAdditionalOptions {
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct IlikeSelectItem {
     /// The pattern expression used with `ILIKE`.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub pattern: String,
 }
 
@@ -3912,6 +3917,7 @@ pub enum ForClause {
         /// JSON mode (`AUTO` or `PATH`).
         for_json: ForJson,
         /// Optional `ROOT('...')` parameter.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         root: Option<String>,
         /// `INCLUDE_NULL_VALUES` flag.
         include_null_values: bool,
@@ -3927,6 +3933,7 @@ pub enum ForClause {
         /// `BINARY BASE64` flag.
         binary_base64: bool,
         /// Optional `ROOT('...')` parameter.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         root: Option<String>,
         /// `TYPE` flag.
         r#type: bool,
@@ -3990,13 +3997,19 @@ impl fmt::Display for ForClause {
 /// Modes for `FOR XML` clause.
 pub enum ForXml {
     /// `RAW` mode with optional root name: `RAW('root')`.
-    Raw(Option<String>),
+    Raw(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
+        Option<String>,
+    ),
     /// `AUTO` mode.
     Auto,
     /// `EXPLICIT` mode.
     Explicit,
     /// `PATH` mode with optional root: `PATH('root')`.
-    Path(Option<String>),
+    Path(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
+        Option<String>,
+    ),
 }
 
 impl fmt::Display for ForXml {
@@ -4207,6 +4220,7 @@ pub struct OpenJsonTableColumn {
     /// The type of the column to be extracted.
     pub r#type: DataType,
     /// The path to the column to be extracted. Must be a literal string.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub path: Option<String>,
     /// The `AS JSON` option.
     pub as_json: bool,

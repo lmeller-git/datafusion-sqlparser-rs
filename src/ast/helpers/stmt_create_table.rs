@@ -24,6 +24,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "visitor")]
 use sqlparser_derive::{Visit, VisitMut};
 
+#[cfg(feature = "arbitrary-derive")]
+use crate::ast::optional_sql_safe_string;
+
 use crate::ast::{
     ClusteredBy, ColumnDef, CommentDef, CreateTable, CreateTableLikeKind, CreateTableOptions,
     DistStyle, Expr, FileFormat, ForValues, HiveDistributionStyle, HiveFormat, Ident,
@@ -99,6 +102,7 @@ pub struct CreateTableBuilder {
     /// Optional file format for storage.
     pub file_format: Option<FileFormat>,
     /// Optional storage location.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub location: Option<String>,
     /// Optional `AS SELECT` query for the table.
     pub query: Option<Box<Query>>,
@@ -145,6 +149,7 @@ pub struct CreateTableBuilder {
     /// Optional max data extension time in days.
     pub max_data_extension_time_in_days: Option<u64>,
     /// Optional default DDL collation.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub default_ddl_collation: Option<String>,
     /// Optional aggregation policy object name.
     pub with_aggregation_policy: Option<ObjectName>,
@@ -155,18 +160,23 @@ pub struct CreateTableBuilder {
     /// Optional tags/labels attached to the table metadata.
     pub with_tags: Option<Vec<Tag>>,
     /// Optional base location for staged data.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub base_location: Option<String>,
     /// Optional external volume identifier.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub external_volume: Option<String>,
     /// Optional catalog name.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub catalog: Option<String>,
     /// Optional catalog synchronization option.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub catalog_sync: Option<String>,
     /// Optional storage serialization policy.
     pub storage_serialization_policy: Option<StorageSerializationPolicy>,
     /// Parsed table options from the statement.
     pub table_options: CreateTableOptions,
     /// Optional target lag configuration.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub target_lag: Option<String>,
     /// Optional warehouse identifier.
     pub warehouse: Option<Ident>,

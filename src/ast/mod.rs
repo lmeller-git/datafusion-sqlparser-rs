@@ -207,6 +207,20 @@ fn arbitrary_quote_style_ident(u: &mut arbitrary::Unstructured) -> arbitrary::Re
     Ok(*u.choose(&choices)?)
 }
 
+/// generates a string fro arbitrary which does not contain chars used for quoting
+#[cfg(feature = "arbitrary-derive")]
+pub fn sql_safe_string(u: &mut arbitrary::Unstructured) -> arbitrary::Result<String> {
+    let len = u.arbitrary_len::<u8>()? % 32;
+    let mut s = String::with_capacity(len);
+
+    let charset = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+
+    for _ in 0..len {
+        s.push(*u.choose(charset)? as char);
+    }
+    Ok(s)
+}
+
 /// An identifier, decomposed into its value or character data and the quote style.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -214,6 +228,7 @@ fn arbitrary_quote_style_ident(u: &mut arbitrary::Unstructured) -> arbitrary::Re
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct Ident {
     /// The value of the identifier without quotes.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub value: String,
     /// The starting quote if any. Valid quote characters are the single quote,
     /// double quote, backtick, and opening square bracket.
@@ -692,6 +707,7 @@ pub enum JsonPathElem {
     /// See <https://docs.snowflake.com/en/user-guide/querying-semistructured#dot-notation>.
     Dot {
         /// The object key text (without quotes).
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
         key: String,
         /// `true` when the key was quoted in the source.
         quoted: bool,
@@ -3374,6 +3390,7 @@ pub enum Set {
         /// Character set name to set.
         charset_name: Ident,
         /// Optional collation name.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         collation_name: Option<String>,
     },
     /// ```sql
@@ -3581,6 +3598,65 @@ impl fmt::Display for Analyze {
     }
 }
 
+/// generates a string fro arbitrary which does not contain chars used for quoting
+#[cfg(feature = "arbitrary-derive")]
+pub fn optional_sql_safe_string(
+    u: &mut arbitrary::Unstructured,
+) -> arbitrary::Result<Option<String>> {
+    if u.ratio(1, 2)? {
+        return Ok(None);
+    }
+    let len = u.arbitrary_len::<u8>()? % 32;
+    let mut s = String::with_capacity(len);
+
+    let charset = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+
+    for _ in 0..len {
+        s.push(*u.choose(charset)? as char);
+    }
+    Ok(Some(s))
+}
+
+/// generates a string fro arbitrary which does not contain chars used for quoting
+#[cfg(feature = "arbitrary-derive")]
+pub fn optional_sql_safe_string_vec(
+    u: &mut arbitrary::Unstructured,
+) -> arbitrary::Result<Vec<Option<String>>> {
+    let len = u.arbitrary_len::<u8>()? % 32;
+    let mut s = Vec::with_capacity(len);
+
+    for _ in 0..len {
+        s.push(optional_sql_safe_string(u)?);
+    }
+
+    Ok(s)
+}
+
+/// generates a string fro arbitrary which does not contain chars used for quoting
+#[cfg(feature = "arbitrary-derive")]
+pub fn sql_safe_string_vec_option(
+    u: &mut arbitrary::Unstructured,
+) -> arbitrary::Result<Option<Vec<String>>> {
+    if u.ratio(1, 2)? {
+        return Ok(None);
+    }
+
+    Ok(Some(sql_safe_string_vec(u)?))
+}
+
+/// generates a string fro arbitrary which does not contain chars used for quoting
+#[cfg(feature = "arbitrary-derive")]
+pub fn sql_safe_string_vec(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Vec<String>> {
+    let len = u.arbitrary_len::<u8>()? % 32;
+    let mut s = Vec::with_capacity(len);
+
+    for _ in 0..len {
+        s.push(sql_safe_string(u)?);
+    }
+
+    Ok(s)
+}
+
 /// A top-level statement (SELECT, INSERT, CREATE, etc.)
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -3639,6 +3715,7 @@ pub enum Statement {
         /// Whether the directory is local to the server.
         local: bool,
         /// Path to the directory or files.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
         path: String,
         /// Optional file format for the data.
         file_format: Option<FileFormat>,
@@ -3672,6 +3749,7 @@ pub enum Statement {
         /// WITH options (before PostgreSQL version 9.0)
         legacy_options: Vec<CopyLegacyOption>,
         /// VALUES a vector of values to be copied
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string_vec))]
         values: Vec<Option<String>>,
     },
     /// ```sql
@@ -3703,14 +3781,17 @@ pub enum Statement {
         /// Optional source query instead of a staged object.
         from_query: Option<Box<Query>>,
         /// Optional list of specific file names to load.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string_vec_option))]
         files: Option<Vec<String>>,
         /// Optional filename matching pattern.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         pattern: Option<String>,
         /// File format options.
         file_format: KeyValueOptions,
         /// Additional copy options.
         copy_options: KeyValueOptions,
         /// Optional validation mode string.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         validation_mode: Option<String>,
         /// Optional partition expression for loading.
         partition: Option<Box<Expr>>,
@@ -3907,6 +3988,7 @@ pub enum Statement {
         /// Optional connector properties to set.
         properties: Option<Vec<SqlOption>>,
         /// Optional new URL for the connector.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         url: Option<String>,
         /// Optional new owner specification.
         owner: Option<ddl::AlterConnectorOwner>,
@@ -4119,6 +4201,7 @@ pub enum Statement {
         /// Optional flush location (dialect-specific).
         location: Option<FlushLocation>,
         /// Optional channel name used for flush operations.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         channel: Option<String>,
         /// Whether a read lock was requested.
         read_lock: bool,
@@ -4352,6 +4435,7 @@ pub enum Statement {
         /// Name of the object the comment applies to.
         object_name: ObjectName,
         /// Optional comment text (None to remove comment).
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         comment: Option<String>,
         /// An optional `IF EXISTS` clause. (Non-standard.)
         /// See <https://docs.snowflake.com/en/sql-reference/sql/comment>
@@ -4435,8 +4519,10 @@ pub enum Statement {
         /// `IF NOT EXISTS` flag.
         if_not_exists: bool,
         /// Optional location URI.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         location: Option<String>,
         /// Optional managed location.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         managed_location: Option<String>,
         /// `OR REPLACE` flag.
         or_replace: bool,
@@ -4449,26 +4535,34 @@ pub enum Statement {
         /// Optional maximum data extension time in days.
         max_data_extension_time_in_days: Option<u64>,
         /// Optional external volume identifier.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         external_volume: Option<String>,
         /// Optional catalog name.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         catalog: Option<String>,
         /// Whether to replace invalid characters.
         replace_invalid_characters: Option<bool>,
         /// Default DDL collation string.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         default_ddl_collation: Option<String>,
         /// Storage serialization policy.
         storage_serialization_policy: Option<StorageSerializationPolicy>,
         /// Optional comment.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         comment: Option<String>,
         /// Optional default character set (MySQL).
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         default_charset: Option<String>,
         /// Optional default collation (MySQL).
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         default_collation: Option<String>,
         /// Optional catalog sync identifier.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         catalog_sync: Option<String>,
         /// Catalog sync namespace mode.
         catalog_sync_namespace_mode: Option<CatalogSyncNamespaceMode>,
         /// Optional flatten delimiter for namespace sync.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         catalog_sync_namespace_flatten_delimiter: Option<String>,
         /// Optional tags for the database.
         with_tags: Option<Vec<Tag>>,
@@ -4544,6 +4638,7 @@ pub enum Statement {
         /// Copy options for stage.
         copy_options: KeyValueOptions,
         /// Optional comment.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         comment: Option<String>,
     },
     /// ```sql
@@ -4803,6 +4898,7 @@ pub enum Statement {
         /// Optional query AST to unload.
         query: Option<Box<Query>>,
         /// Optional original query text.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         query_text: Option<String>,
         /// Destination identifier.
         to: Ident,
@@ -4878,6 +4974,7 @@ pub enum Statement {
         /// Notification channel identifier.
         channel: Ident,
         /// Optional payload string.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         payload: Option<String>,
     },
     /// ```sql
@@ -4892,6 +4989,7 @@ pub enum Statement {
         /// Whether `LOCAL` is present.
         local: bool,
         /// Input path for files to load.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
         inpath: String,
         /// Whether `OVERWRITE` was specified.
         overwrite: bool,
@@ -8675,6 +8773,7 @@ pub enum HiveRowFormat {
     /// SerDe class specification with the implementing class name.
     SERDE {
         /// The SerDe implementation class name.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
         class: String,
     },
     /// Delimited row format with one or more delimiter specifications.
@@ -8839,6 +8938,7 @@ pub struct HiveFormat {
     /// Optional input/output storage format details.
     pub storage: Option<HiveIOFormat>,
     /// Optional location (URI or path) for table data.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub location: Option<String>,
 }
 
@@ -9041,6 +9141,7 @@ pub enum StorageType {
 /// <https://dev.mysql.com/doc/refman/8.4/en/create-table.html>
 pub struct TablespaceOption {
     /// Name of the tablespace.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub name: String,
     /// Optional storage type for the tablespace.
     pub storage: Option<StorageType>,
@@ -9278,13 +9379,13 @@ impl fmt::Display for TransactionModifier {
 /// Filter forms usable in SHOW statements.
 pub enum ShowStatementFilter {
     /// Filter using LIKE pattern.
-    Like(String),
+    Like(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// Filter using ILIKE pattern.
-    ILike(String),
+    ILike(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// Filter using a WHERE expression.
     Where(Expr),
     /// Filter provided without a keyword (raw string).
-    NoKeyword(String),
+    NoKeyword(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
 }
 
 impl fmt::Display for ShowStatementFilter {
@@ -9415,11 +9516,13 @@ pub enum CopyTarget {
     /// Read from or write to a file.
     File {
         /// The path name of the input or output file.
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
         filename: String,
     },
     /// Use a program as the source or target (shell command).
     Program {
         /// A command to execute
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
         command: String,
     },
 }
@@ -9469,7 +9572,7 @@ pub enum CopyOption {
     /// DELIMITER 'delimiter_character'
     Delimiter(char),
     /// NULL 'null_string'
-    Null(String),
+    Null(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// HEADER \[ boolean \]
     Header(bool),
     /// QUOTE 'quote_character'
@@ -9483,7 +9586,7 @@ pub enum CopyOption {
     /// FORCE_NULL ( column_name [, ...] )
     ForceNull(Vec<Ident>),
     /// ENCODING 'encoding_name'
-    Encoding(String),
+    Encoding(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
 }
 
 impl fmt::Display for CopyOption {
@@ -9521,7 +9624,10 @@ pub enum CopyLegacyOption {
     /// ACCEPTANYDATE
     AcceptAnyDate,
     /// ACCEPTINVCHARS
-    AcceptInvChars(Option<String>),
+    AcceptInvChars(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
+        Option<String>,
+    ),
     /// ADDQUOTES
     AddQuotes,
     /// ALLOWOVERWRITE
@@ -9544,7 +9650,10 @@ pub enum CopyLegacyOption {
     /// CSV ...
     Csv(Vec<CopyLegacyCsvOption>),
     /// DATEFORMAT \[ AS \] {'dateformat_string' | 'auto' }
-    DateFormat(Option<String>),
+    DateFormat(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
+        Option<String>,
+    ),
     /// DELIMITER \[ AS \] 'delimiter_character'
     Delimiter(char),
     /// EMPTYASNULL
@@ -9557,9 +9666,9 @@ pub enum CopyLegacyOption {
     /// ESCAPE
     Escape,
     /// EXTENSION 'extension-name'
-    Extension(String),
+    Extension(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// FIXEDWIDTH \[ AS \] 'fixedwidth-spec'
-    FixedWidth(String),
+    FixedWidth(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// GZIP
     Gzip,
     /// HEADER
@@ -9569,7 +9678,10 @@ pub enum CopyLegacyOption {
     /// IGNOREHEADER \[ AS \] number_rows
     IgnoreHeader(u64),
     /// JSON \[ AS \] 'json_option'
-    Json(Option<String>),
+    Json(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
+        Option<String>,
+    ),
     /// MANIFEST \[ VERBOSE \]
     Manifest {
         /// Whether the MANIFEST is verbose.
@@ -9586,7 +9698,7 @@ pub enum CopyLegacyOption {
     /// PARTITION BY ( column_name [, ... ] ) \[ INCLUDE \]
     PartitionBy(UnloadPartitionBy),
     /// REGION \[ AS \] 'aws-region' }
-    Region(String),
+    Region(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// REMOVEQUOTES
     RemoveQuotes,
     /// ROWGROUPSIZE \[ AS \] size \[ MB | GB \]
@@ -9594,14 +9706,19 @@ pub enum CopyLegacyOption {
     /// STATUPDATE [ { ON | TRUE } | { OFF | FALSE } ]
     StatUpdate(Option<bool>),
     /// TIMEFORMAT \[ AS \] {'timeformat_string' | 'auto' | 'epochsecs' | 'epochmillisecs' }
-    TimeFormat(Option<String>),
+    TimeFormat(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
+        Option<String>,
+    ),
     /// TRUNCATECOLUMNS
     TruncateColumns,
     /// ZSTD
     Zstd,
     /// Redshift `CREDENTIALS 'auth-args'`
     /// <https://docs.aws.amazon.com/redshift/latest/dg/copy-parameters-authorization.html>
-    Credentials(String),
+    Credentials(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
 }
 
 impl fmt::Display for CopyLegacyOption {
@@ -9800,7 +9917,7 @@ pub enum IamRoleKind {
     /// Default role
     Default,
     /// Specific role ARN, for example: `arn:aws:iam::123456789:role/role1`
-    Arn(String),
+    Arn(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
 }
 
 impl fmt::Display for IamRoleKind {
@@ -10375,11 +10492,11 @@ pub enum CreateFunctionBody {
 /// `USING` clause options for `CREATE FUNCTION` (e.g., JAR, FILE, ARCHIVE).
 pub enum CreateFunctionUsing {
     /// Use a JAR file located at the given URI.
-    Jar(String),
+    Jar(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// Use a file located at the given URI.
-    File(String),
+    File(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// Use an archive located at the given URI.
-    Archive(String),
+    Archive(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
 }
 
 impl fmt::Display for CreateFunctionUsing {
@@ -10809,6 +10926,7 @@ pub struct Tag {
     /// The tag key (can be qualified).
     pub key: ObjectName,
     /// The tag value as a string.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub value: String,
 }
 
@@ -10834,8 +10952,10 @@ impl Display for Tag {
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct ContactEntry {
     /// The purpose label for the contact entry.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub purpose: String,
     /// The contact information associated with the purpose.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub contact: String,
 }
 
@@ -10853,9 +10973,9 @@ impl Display for ContactEntry {
 pub enum CommentDef {
     /// Includes `=` when printing the comment, as `COMMENT = 'comment'`
     /// Does not include `=` when printing the comment, as `COMMENT 'comment'`
-    WithEq(String),
+    WithEq(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// Comment variant that omits the `=` when displayed.
-    WithoutEq(String),
+    WithoutEq(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
 }
 
 impl Display for CommentDef {
@@ -11301,8 +11421,10 @@ impl fmt::Display for SetSessionParamKind {
 /// Generic `SET SESSION` parameter represented as name(s) and value.
 pub struct SetSessionParamGeneric {
     /// Names of the session parameters being set.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string_vec))]
     pub names: Vec<String>,
     /// The value to assign to the parameter(s).
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub value: String,
 }
 
@@ -11337,6 +11459,7 @@ impl fmt::Display for SetSessionParamIdentityInsert {
 /// Offsets-related session parameter with keywords and a value.
 pub struct SetSessionParamOffsets {
     /// Keywords specifying which offsets to modify.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string_vec))]
     pub keywords: Vec<String>,
     /// Value (ON/OFF) for the offsets setting.
     pub value: SessionParamValue,
@@ -11771,10 +11894,12 @@ pub struct AlterUser {
     /// Key/value tag options to set on the user.
     pub set_tag: KeyValueOptions,
     /// Tags to unset on the user.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string_vec))]
     pub unset_tag: Vec<String>,
     /// Key/value properties to set on the user.
     pub set_props: KeyValueOptions,
     /// Properties to unset on the user.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string_vec))]
     pub unset_props: Vec<String>,
     /// The following options are PostgreSQL-specific: <https://www.postgresql.org/docs/current/sql-alteruser.html>
     pub password: Option<AlterUserPassword>,
@@ -11831,6 +11956,7 @@ pub struct AlterUserModifyMfaMethod {
     /// The MFA method being modified.
     pub method: MfaMethodKind,
     /// The new comment for the MFA method.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub comment: String,
 }
 
@@ -11994,6 +12120,7 @@ pub struct AlterUserPassword {
     /// Whether the password is encrypted.
     pub encrypted: bool,
     /// The password string, or `None` for `NULL`.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub password: Option<String>,
 }
 
@@ -12220,8 +12347,10 @@ pub struct OptimizerHint {
     /// while system-specific hints like `/*abc+ ... */` have `prefix = "abc"`.
     /// The prefix is any sequence of ASCII alphanumeric characters
     /// immediately before the `+` marker.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub prefix: String,
     /// the raw text of the optimizer hint without its markers
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub text: String,
     /// the style of the comment which `text` was extracted from,
     /// e.g. `/*+...*/` or `--+...`
@@ -12240,6 +12369,7 @@ pub enum OptimizerHintStyle {
     /// e.g. `--+ LEADING(v.e v.d t)`
     SingleLine {
         /// the comment prefix, e.g. `--`
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
         prefix: String,
     },
     /// A hint corresponding to a multi line comment,

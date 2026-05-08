@@ -26,6 +26,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "visitor")]
 use sqlparser_derive::{Visit, VisitMut};
 
+#[cfg(feature = "arbitrary-derive")]
+use crate::ast::{sql_safe_string, sql_safe_string_vec};
+
 use super::display_separated;
 
 /// Unary operators
@@ -147,7 +150,7 @@ pub enum BinaryOperator {
     /// REGEXP operator, e.g. `a REGEXP b` (SQLite-specific)
     Regexp,
     /// Support for custom operators (such as Postgres custom operators)
-    Custom(String),
+    Custom(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// Bitwise XOR, e.g. `a # b` (PostgreSQL-specific)
     PGBitwiseXor,
     /// Bitwise shift left, e.g. `a << b` (PostgreSQL-specific)
@@ -274,7 +277,10 @@ pub enum BinaryOperator {
     ///
     /// See [CREATE OPERATOR](https://www.postgresql.org/docs/current/sql-createoperator.html)
     /// for more information.
-    PGCustomBinaryOperator(Vec<String>),
+    PGCustomBinaryOperator(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string_vec))]
+        Vec<String>,
+    ),
     /// The `OVERLAPS` operator
     ///
     /// Specifies a test for an overlap between two datetime periods:

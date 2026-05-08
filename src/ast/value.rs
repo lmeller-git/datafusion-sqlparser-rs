@@ -133,6 +133,34 @@ impl DerefMut for ValueWithSpan {
     }
 }
 
+/// generates a string fro arbitrary which does not contain chars used for quoting
+#[cfg(feature = "arbitrary-derive")]
+pub fn sql_safe_string(u: &mut arbitrary::Unstructured) -> arbitrary::Result<String> {
+    let len = u.arbitrary_len::<u8>()? % 32;
+    let mut s = String::with_capacity(len);
+
+    let charset = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+
+    for _ in 0..len {
+        s.push(*u.choose(charset)? as char);
+    }
+    Ok(s)
+}
+
+/// generates a placeholder string
+#[cfg(feature = "arbitrary-derive")]
+pub fn placeholder(u: &mut arbitrary::Unstructured) -> arbitrary::Result<String> {
+    let len = u.arbitrary_len::<u8>()? % 2;
+    let mut s = String::with_capacity(len);
+
+    let charset = b"?$";
+
+    for _ in 0..len {
+        s.push(*u.choose(charset)? as char);
+    }
+    Ok(s)
+}
+
 /// Primitive SQL values such as number and string
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -141,7 +169,10 @@ impl DerefMut for ValueWithSpan {
 pub enum Value {
     /// Numeric literal
     #[cfg(not(feature = "bigdecimal"))]
-    Number(String, bool),
+    Number(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+        bool,
+    ),
     #[cfg(feature = "bigdecimal")]
     /// HINT: use `test_utils::number` to make an instance of
     /// Value::Number This might help if you your tests pass locally
@@ -149,47 +180,75 @@ pub enum Value {
     /// Numeric literal (uses `BigDecimal` when the `bigdecimal` feature is enabled).
     Number(BigDecimal, bool),
     /// 'string value'
-    SingleQuotedString(String),
+    SingleQuotedString(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// Dollar-quoted string literal, e.g. `$$...$$` or `$tag$...$tag$` (Postgres syntax).
     DollarQuotedString(DollarQuotedString),
     /// Triple single quoted strings: Example '''abc'''
     /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#quoted_literals)
-    TripleSingleQuotedString(String),
+    TripleSingleQuotedString(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// Triple double quoted strings: Example """abc"""
     /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#quoted_literals)
-    TripleDoubleQuotedString(String),
+    TripleDoubleQuotedString(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// e'string value' (postgres extension)
     /// See [Postgres docs](https://www.postgresql.org/docs/8.3/sql-syntax-lexical.html#SQL-SYNTAX-STRINGS)
     /// for more details.
-    EscapedStringLiteral(String),
+    EscapedStringLiteral(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// u&'string value' (postgres extension)
     /// See [Postgres docs](https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-STRINGS-UESCAPE)
     /// for more details.
-    UnicodeStringLiteral(String),
+    UnicodeStringLiteral(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// B'string value'
-    SingleQuotedByteStringLiteral(String),
+    SingleQuotedByteStringLiteral(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// B"string value"
-    DoubleQuotedByteStringLiteral(String),
+    DoubleQuotedByteStringLiteral(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// Triple single quoted literal with byte string prefix. Example `B'''abc'''`
     /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#quoted_literals)
-    TripleSingleQuotedByteStringLiteral(String),
+    TripleSingleQuotedByteStringLiteral(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// Triple double quoted literal with byte string prefix. Example `B"""abc"""`
     /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#quoted_literals)
-    TripleDoubleQuotedByteStringLiteral(String),
+    TripleDoubleQuotedByteStringLiteral(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// Single quoted literal with raw string prefix. Example `R'abc'`
     /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#quoted_literals)
-    SingleQuotedRawStringLiteral(String),
+    SingleQuotedRawStringLiteral(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// Double quoted literal with raw string prefix. Example `R"abc"`
     /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#quoted_literals)
-    DoubleQuotedRawStringLiteral(String),
+    DoubleQuotedRawStringLiteral(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// Triple single quoted literal with raw string prefix. Example `R'''abc'''`
     /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#quoted_literals)
-    TripleSingleQuotedRawStringLiteral(String),
+    TripleSingleQuotedRawStringLiteral(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// Triple double quoted literal with raw string prefix. Example `R"""abc"""`
     /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#quoted_literals)
-    TripleDoubleQuotedRawStringLiteral(String),
+    TripleDoubleQuotedRawStringLiteral(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// N'string value'
-    NationalStringLiteral(String),
+    NationalStringLiteral(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// Quote delimited literal. Examples `Q'{ab'c}'`, `Q'|ab'c|'`, `Q'|ab|c|'`
     /// [Oracle](https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/Literals.html#GUID-1824CBAA-6E16-4921-B2A6-112FB02248DA)
     QuoteDelimitedStringLiteral(QuoteDelimitedString),
@@ -197,16 +256,20 @@ pub enum Value {
     /// [Oracle](https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/Literals.html#GUID-1824CBAA-6E16-4921-B2A6-112FB02248DA)
     NationalQuoteDelimitedStringLiteral(QuoteDelimitedString),
     /// X'hex value'
-    HexStringLiteral(String),
+    HexStringLiteral(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
 
     /// Double quoted string literal, e.g. `"abc"`.
-    DoubleQuotedString(String),
+    DoubleQuotedString(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+    ),
     /// Boolean value true or false
     Boolean(bool),
     /// `NULL` value
     Null,
     /// `?` or `$` Prepared statement arg placeholder
-    Placeholder(String),
+    Placeholder(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = placeholder))] String),
 }
 
 impl ValueWithSpan {
@@ -294,6 +357,25 @@ impl fmt::Display for Value {
     }
 }
 
+/// generates a string fro arbitrary which does not contain chars used for quoting
+#[cfg(feature = "arbitrary-derive")]
+pub fn optional_sql_safe_string(
+    u: &mut arbitrary::Unstructured,
+) -> arbitrary::Result<Option<String>> {
+    if u.ratio(1, 2)? {
+        return Ok(None);
+    }
+    let len = u.arbitrary_len::<u8>()? % 32;
+    let mut s = String::with_capacity(len);
+
+    let charset = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+
+    for _ in 0..len {
+        s.push(*u.choose(charset)? as char);
+    }
+    Ok(Some(s))
+}
+
 /// A dollar-quoted string literal, e.g. `$$...$$` or `$tag$...$tag$`.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -301,8 +383,10 @@ impl fmt::Display for Value {
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct DollarQuotedString {
     /// Inner string contents.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub value: String,
     /// Optional tag used in the opening/closing delimiter.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub tag: Option<String>,
 }
 
@@ -319,6 +403,13 @@ impl fmt::Display for DollarQuotedString {
     }
 }
 
+/// generates a char fro arbitrary which does not contain chars used for quoting
+#[cfg(feature = "arbitrary-derive")]
+pub fn sql_safe_char(u: &mut arbitrary::Unstructured) -> arbitrary::Result<char> {
+    let charset = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+    Ok(*u.choose(charset)? as char)
+}
+
 /// A quote delimited string literal, e.g. `Q'_abc_'`.
 ///
 /// See [Value::QuoteDelimitedStringLiteral] and/or
@@ -329,10 +420,13 @@ impl fmt::Display for DollarQuotedString {
 #[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
 pub struct QuoteDelimitedString {
     /// the quote start character; i.e. the character _after_ the opening `Q'`
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_char))]
     pub start_quote: char,
     /// the string literal value itself
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub value: String,
     /// the quote end character; i.e. the character _before_ the closing `'`
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_char))]
     pub end_quote: char,
 }
 

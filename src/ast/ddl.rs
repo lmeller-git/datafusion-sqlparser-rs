@@ -34,6 +34,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "visitor")]
 use sqlparser_derive::{Visit, VisitMut};
 
+#[cfg(feature = "arbitrary-derive")]
+use crate::ast::{optional_sql_safe_string, sql_safe_string};
+
 use crate::ast::value::escape_single_quote_string;
 use crate::ast::{
     display_comma_separated, display_separated,
@@ -477,6 +480,7 @@ pub enum AlterTableOperation {
     /// <https://docs.snowflake.com/en/sql-reference/sql/alter-external-table>
     Refresh {
         /// Optional subpath for external table refresh
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
         subpath: Option<String>,
     },
     /// `SUSPEND`
@@ -1480,7 +1484,7 @@ pub enum IndexOption {
     /// Note that we permissively parse non-MySQL index types, like `GIN`.
     Using(IndexType),
     /// `COMMENT 'string'`: Specifies a comment for the index.
-    Comment(String),
+    Comment(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
 }
 
 impl fmt::Display for IndexOption {
@@ -1973,7 +1977,7 @@ pub enum ColumnOption {
     /// `COLLATE <name>` column option
     Collation(ObjectName),
     /// `COMMENT '<text>'` column option
-    Comment(String),
+    Comment(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// `ON UPDATE <expr>` column option
     OnUpdate(Expr),
     /// `Generated`s are modifiers that follow a column definition in a `CREATE
@@ -2724,7 +2728,7 @@ pub enum UserDefinedTypeSqlDefinitionOption {
     /// Element type for array types: `ELEMENT = element`
     Element(DataType),
     /// Delimiter character for array value display: `DELIMITER = delimiter`
-    Delimiter(String),
+    Delimiter(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// Whether the type supports collation: `COLLATABLE = collatable`
     Collatable(bool),
 }
@@ -2987,6 +2991,7 @@ pub struct CreateTable {
     /// General comment for the table
     pub file_format: Option<FileFormat>,
     /// Location of the table data
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub location: Option<String>,
     /// Query used to populate the table
     pub query: Option<Box<Query>>,
@@ -3060,6 +3065,7 @@ pub struct CreateTable {
     pub max_data_extension_time_in_days: Option<u64>,
     /// Snowflake "DEFAULT_DDL_COLLATION" clause
     /// <https://docs.snowflake.com/en/sql-reference/sql/create-table>
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub default_ddl_collation: Option<String>,
     /// Snowflake "WITH AGGREGATION POLICY" clause
     /// <https://docs.snowflake.com/en/sql-reference/sql/create-table>
@@ -3075,21 +3081,26 @@ pub struct CreateTable {
     pub with_tags: Option<Vec<Tag>>,
     /// Snowflake "EXTERNAL_VOLUME" clause for Iceberg tables
     /// <https://docs.snowflake.com/en/sql-reference/sql/create-iceberg-table>
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub external_volume: Option<String>,
     /// Snowflake "BASE_LOCATION" clause for Iceberg tables
     /// <https://docs.snowflake.com/en/sql-reference/sql/create-iceberg-table>
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub base_location: Option<String>,
     /// Snowflake "CATALOG" clause for Iceberg tables
     /// <https://docs.snowflake.com/en/sql-reference/sql/create-iceberg-table>
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub catalog: Option<String>,
     /// Snowflake "CATALOG_SYNC" clause for Iceberg tables
     /// <https://docs.snowflake.com/en/sql-reference/sql/create-iceberg-table>
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub catalog_sync: Option<String>,
     /// Snowflake "STORAGE_SERIALIZATION_POLICY" clause for Iceberg tables
     /// <https://docs.snowflake.com/en/sql-reference/sql/create-iceberg-table>
     pub storage_serialization_policy: Option<StorageSerializationPolicy>,
     /// Snowflake "TARGET_LAG" clause for dybamic tables
     /// <https://docs.snowflake.com/en/sql-reference/sql/create-dynamic-table>
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub target_lag: Option<String>,
     /// Snowflake "WAREHOUSE" clause for dybamic tables
     /// <https://docs.snowflake.com/en/sql-reference/sql/create-dynamic-table>
@@ -3804,8 +3815,10 @@ pub struct CreateConnector {
     /// Whether `IF NOT EXISTS` was specified.
     pub if_not_exists: bool,
     /// The type of the connector.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub connector_type: Option<String>,
     /// The URL of the connector.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub url: Option<String>,
     /// The comment for the connector.
     pub comment: Option<CommentDef>,
@@ -4397,6 +4410,7 @@ pub struct CreateView {
     pub cluster_by: Vec<Ident>,
     /// Snowflake: Views can have comments in Snowflake.
     /// <https://docs.snowflake.com/en/sql-reference/sql/create-view#syntax>
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub comment: Option<String>,
     /// if true, has RedShift [`WITH NO SCHEMA BINDING`] clause <https://docs.aws.amazon.com/redshift/latest/dg/r_CREATE_VIEW.html>
     pub with_no_schema_binding: bool,

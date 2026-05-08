@@ -24,6 +24,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "visitor")]
 use sqlparser_derive::{Visit, VisitMut};
 
+#[cfg(feature = "arbitrary-derive")]
+use crate::ast::optional_sql_safe_string;
+
 use crate::ast::{
     CatalogSyncNamespaceMode, ContactEntry, ObjectName, Statement, StorageSerializationPolicy, Tag,
 };
@@ -61,8 +64,10 @@ pub struct CreateDatabaseBuilder {
     /// Whether `IF NOT EXISTS` was specified.
     pub if_not_exists: bool,
     /// Optional storage location for the database.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub location: Option<String>,
     /// Optional managed storage location.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub managed_location: Option<String>,
     /// Whether `OR REPLACE` was specified.
     pub or_replace: bool,
@@ -75,30 +80,38 @@ pub struct CreateDatabaseBuilder {
     /// Optional max data extension time in days.
     pub max_data_extension_time_in_days: Option<u64>,
     /// Optional external volume identifier.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub external_volume: Option<String>,
     /// Optional catalog name.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub catalog: Option<String>,
     /// Whether to replace invalid characters.
     pub replace_invalid_characters: Option<bool>,
     /// Optional default DDL collation.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub default_ddl_collation: Option<String>,
     /// Optional storage serialization policy.
     pub storage_serialization_policy: Option<StorageSerializationPolicy>,
     /// Optional comment attached to the database.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub comment: Option<String>,
     /// Optional default character set (MySQL).
     ///
     /// <https://dev.mysql.com/doc/refman/8.4/en/create-database.html>
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub default_charset: Option<String>,
     /// Optional default collation (MySQL).
     ///
     /// <https://dev.mysql.com/doc/refman/8.4/en/create-database.html>
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub default_collation: Option<String>,
     /// Optional catalog sync configuration.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub catalog_sync: Option<String>,
     /// Optional catalog sync namespace mode.
     pub catalog_sync_namespace_mode: Option<CatalogSyncNamespaceMode>,
     /// Optional namespace flatten delimiter for catalog sync.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub catalog_sync_namespace_flatten_delimiter: Option<String>,
     /// Optional tags attached to the database.
     pub with_tags: Option<Vec<Tag>>,

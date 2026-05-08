@@ -31,6 +31,9 @@ use crate::ast::{Ident, ObjectName, SelectItem};
 #[cfg(feature = "visitor")]
 use sqlparser_derive::{Visit, VisitMut};
 
+#[cfg(feature = "arbitrary-derive")]
+use crate::ast::optional_sql_safe_string;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary-derive", derive(arbitrary::Arbitrary))]
@@ -38,12 +41,15 @@ use sqlparser_derive::{Visit, VisitMut};
 /// Parameters for a named stage object used in data loading/unloading.
 pub struct StageParamsObject {
     /// Optional URL for the stage.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub url: Option<String>,
     /// Encryption-related key/value options.
     pub encryption: KeyValueOptions,
     /// Optional endpoint string.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub endpoint: Option<String>,
     /// Optional storage integration identifier.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub storage_integration: Option<String>,
     /// Credentials for accessing the stage.
     pub credentials: KeyValueOptions,
@@ -139,6 +145,7 @@ pub struct FileStagingCommand {
     #[cfg_attr(feature = "visitor", visit(with = "visit_relation"))]
     pub stage: ObjectName,
     /// Optional file matching `PATTERN` expression.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
     pub pattern: Option<String>,
 }
 

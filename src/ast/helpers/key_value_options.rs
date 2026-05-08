@@ -29,6 +29,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "visitor")]
 use sqlparser_derive::{Visit, VisitMut};
 
+#[cfg(feature = "arbitrary-derive")]
+use crate::ast::sql_safe_string;
+
 use crate::ast::{display_comma_separated, display_separated, ValueWithSpan};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -62,6 +65,7 @@ pub enum KeyValueOptionsDelimiter {
 /// A single key-value option.
 pub struct KeyValueOption {
     /// The name of the option.
+    #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))]
     pub option_name: String,
     /// The value of the option.
     pub option_value: KeyValueOptionKind,

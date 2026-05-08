@@ -25,6 +25,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "visitor")]
 use sqlparser_derive::{Visit, VisitMut};
 
+#[cfg(feature = "arbitrary-derive")]
+use crate::ast::{optional_sql_safe_string, sql_safe_string, sql_safe_string_vec};
+
 use crate::ast::{display_comma_separated, Expr, ObjectName, StructField, UnionField};
 
 use super::{value::escape_single_quote_string, ColumnDef};
@@ -36,11 +39,14 @@ use super::{value::escape_single_quote_string, ColumnDef};
 /// A member of an ENUM type.
 pub enum EnumMember {
     /// Just a name.
-    Name(String),
+    Name(#[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String),
     /// ClickHouse allows to specify an integer value for each enum value.
     ///
     /// [ClickHouse](https://clickhouse.com/docs/en/sql-reference/data-types/enum)
-    NamedValue(String, Expr),
+    NamedValue(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string))] String,
+        Expr,
+    ),
 }
 
 /// SQL data types
@@ -371,7 +377,11 @@ pub enum DataType {
     /// Datetime with time precision and optional timezone, see [ClickHouse][1].
     ///
     /// [1]: https://clickhouse.com/docs/en/sql-reference/data-types/datetime64
-    Datetime64(u64, Option<String>),
+    Datetime64(
+        u64,
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = optional_sql_safe_string))]
+        Option<String>,
+    ),
     /// Timestamp with optional time precision and time zone information, see [SQL Standard][1].
     ///
     /// [1]: https://jakewheat.github.io/sql-overview/sql-2016-foundation-grammar.html#datetime-type
@@ -438,7 +448,11 @@ pub enum DataType {
     /// [PostgreSQL]: https://www.postgresql.org/docs/current/datatype.html
     VarBit(Option<u64>),
     /// Custom types.
-    Custom(ObjectName, Vec<String>),
+    Custom(
+        ObjectName,
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string_vec))]
+        Vec<String>,
+    ),
     /// Arrays.
     Array(ArrayElemTypeDef),
     /// Map, see [ClickHouse].
@@ -456,7 +470,10 @@ pub enum DataType {
     /// Enum type.
     Enum(Vec<EnumMember>, Option<u8>),
     /// Set type.
-    Set(Vec<String>),
+    Set(
+        #[cfg_attr(feature = "arbitrary-derive", arbitrary(with = sql_safe_string_vec))]
+        Vec<String>,
+    ),
     /// Struct type, see [Hive], [BigQuery].
     ///
     /// [Hive]: https://docs.cloudera.com/cdw-runtime/cloud/impala-sql-reference/topics/impala-struct.html
