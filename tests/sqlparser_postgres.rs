@@ -2070,11 +2070,11 @@ fn parse_prepare() {
             assert_eq!(table_name.to_string(), "customers");
             assert!(columns.is_empty());
 
-            let expected_values = [vec![
+            let expected_values = [Parens::with_empty_span(vec![
                 Expr::Identifier("a1".into()),
                 Expr::Identifier("a2".into()),
                 Expr::Identifier("a3".into()),
-            ]];
+            ])];
             match &*source.body {
                 SetExpr::Values(Values { rows, .. }) => {
                     assert_eq!(rows.as_slice(), &expected_values)
@@ -2943,7 +2943,7 @@ fn parse_create_indices_with_operator_classes() {
                         within_group: vec![],
                     }),
                     options: OrderByOptions {
-                        asc: None,
+                        sort: None,
                         nulls_first: None,
                     },
                     with_fill: None,
@@ -3007,7 +3007,7 @@ fn parse_create_indices_with_operator_classes() {
                                     span: Span::empty()
                                 }),
                                 options: OrderByOptions {
-                                    asc: None,
+                                    sort: None,
                                     nulls_first: None,
                                 },
                                 with_fill: None,
@@ -5774,10 +5774,10 @@ fn test_simple_postgres_insert_with_alias() {
                 body: Box::new(SetExpr::Values(Values {
                     value_keyword: false,
                     explicit_row: false,
-                    rows: vec![vec![
+                    rows: vec![Parens::with_empty_span(vec![
                         Expr::Identifier(Ident::new("DEFAULT")),
                         Expr::Value((Value::Number("123".to_string(), false)).with_empty_span())
-                    ]]
+                    ])]
                 })),
                 order_by: None,
                 limit_clause: None,
@@ -5854,13 +5854,13 @@ fn test_simple_postgres_insert_with_alias() {
                 body: Box::new(SetExpr::Values(Values {
                     value_keyword: false,
                     explicit_row: false,
-                    rows: vec![vec![
+                    rows: vec![Parens::with_empty_span(vec![
                         Expr::Identifier(Ident::new("DEFAULT")),
                         Expr::Value(
                             (Value::Number(bigdecimal::BigDecimal::new(123.into(), 0), false))
                                 .with_empty_span()
                         )
-                    ]]
+                    ])]
                 })),
                 order_by: None,
                 limit_clause: None,
@@ -5936,12 +5936,12 @@ fn test_simple_insert_with_quoted_alias() {
                 body: Box::new(SetExpr::Values(Values {
                     value_keyword: false,
                     explicit_row: false,
-                    rows: vec![vec![
+                    rows: vec![Parens::with_empty_span(vec![
                         Expr::Identifier(Ident::new("DEFAULT")),
                         Expr::Value(
                             (Value::SingleQuotedString("0123".to_string())).with_empty_span()
                         )
-                    ]]
+                    ])]
                 })),
                 order_by: None,
                 limit_clause: None,
@@ -6702,6 +6702,7 @@ fn parse_trigger_related_functions() {
             with_tags: None,
             base_location: None,
             external_volume: None,
+            with_connection: None,
             catalog: None,
             catalog_sync: None,
             storage_serialization_policy: None,
@@ -6716,6 +6717,9 @@ fn parse_trigger_related_functions() {
             distkey: None,
             sortkey: None,
             backup: None,
+            multiset: None,
+            fallback: None,
+            with_data: None,
         }
     );
 
